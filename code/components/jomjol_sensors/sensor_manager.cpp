@@ -259,11 +259,23 @@ bool SensorManager::readConfig(const std::string& configFile)
             if (param == "ENABLE") {
                 sht3xEnable = (toUpper(value) == "TRUE" || value == "1");
             } else if (param == "ADDRESS") {
-                sht3xAddress = std::stoul(value, nullptr, 0);
+                try {
+                    sht3xAddress = std::stoul(value, nullptr, 0);
+                } catch (const std::exception& e) {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Invalid SHT3x address value: " + value);
+                }
             } else if (param == "INTERVAL") {
-                sht3xInterval = std::stoi(value);
+                try {
+                    sht3xInterval = std::stoi(value);
+                } catch (const std::exception& e) {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Invalid SHT3x interval value: " + value);
+                }
             } else if (param == "I2C_FREQUENCY") {
-                i2cFreq = std::stoul(value);
+                try {
+                    i2cFreq = std::stoul(value);
+                } catch (const std::exception& e) {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Invalid I2C frequency value: " + value);
+                }
             } else if (param == "MQTT_ENABLE") {
                 sht3xMqttEnable = (toUpper(value) == "TRUE" || value == "1");
             } else if (param == "MQTT_TOPIC") {
@@ -279,7 +291,11 @@ bool SensorManager::readConfig(const std::string& configFile)
             if (param == "ENABLE") {
                 ds18b20Enable = (toUpper(value) == "TRUE" || value == "1");
             } else if (param == "INTERVAL") {
-                ds18b20Interval = std::stoi(value);
+                try {
+                    ds18b20Interval = std::stoi(value);
+                } catch (const std::exception& e) {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Invalid DS18B20 interval value: " + value);
+                }
             } else if (param == "MQTT_ENABLE") {
                 ds18b20MqttEnable = (toUpper(value) == "TRUE" || value == "1");
             } else if (param == "MQTT_TOPIC") {
