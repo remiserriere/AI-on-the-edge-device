@@ -43,7 +43,7 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
 {
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "ReadParameter called");
     
-    // Check if this is the [Sensors] section
+    // Check if this is a sensor section ([SHT3x] or [DS18B20])
     aktparamgraph = trim(aktparamgraph);
     
     if (aktparamgraph.size() == 0) {
@@ -53,20 +53,22 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
     }
     
     std::string upperGraph = toUpper(aktparamgraph);
-    if (upperGraph.compare("[SENSORS]") != 0) {
-        // Not the Sensors section
+    if (upperGraph.compare("[SHT3X]") != 0 && upperGraph.compare("[DS18B20]") != 0) {
+        // Not a sensor section
         return false;
     }
     
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Found [Sensors] section in config");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Found sensor section: " + aktparamgraph);
     
-    // Create sensor manager
-    _sensorManager = std::make_unique<SensorManager>();
-    
-    // Read configuration from file
-    if (!_sensorManager->readConfig(CONFIG_FILE)) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor configuration");
-        return false;
+    // Create sensor manager on first sensor section found
+    if (!_sensorManager) {
+        _sensorManager = std::make_unique<SensorManager>();
+        
+        // Read configuration from file
+        if (!_sensorManager->readConfig(CONFIG_FILE)) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor configuration");
+            return false;
+        }
     }
     
     // Skip to next paragraph
@@ -98,7 +100,8 @@ bool ClassFlowSensors::doFlow(std::string time)
     }
     
     // Update sensors (read and publish if interval elapsed)
-    _sensorManager->update();
+    // Pass 0 as flowInterval - sensors with interval=-1 will use their own timer
+    _sensorManager->update(0);
     
     return true;
 }

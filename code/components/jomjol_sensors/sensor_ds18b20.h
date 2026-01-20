@@ -52,6 +52,7 @@ private:
     gpio_num_t _gpio;
     onewire_bus_handle_t _busHandle;
     bool _initialized;
+    std::vector<std::string> _deviceROMs;  // Store ROM codes as hex strings for identification
     
     /**
      * @brief Scan the 1-Wire bus for DS18B20 devices
@@ -65,6 +66,14 @@ private:
      * @return true if successful
      */
     bool readOneSensor(float& temp);
+    
+    /**
+     * @brief Read temperature from a specific sensor by ROM
+     * @param rom 8-byte ROM code
+     * @param temp Output temperature value
+     * @return true if successful
+     */
+    bool readSensorByROM(const uint8_t* rom, float& temp);
 };
 
 #endif // SENSOR_DS18B20_H

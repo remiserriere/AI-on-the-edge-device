@@ -41,22 +41,21 @@ public:
      * @brief Get sensor name/identifier
      */
     virtual std::string getName() = 0;
+    
+    /**
+     * @brief Check if it's time to read this sensor
+     * @param flowInterval Current flow interval in seconds (for "follow flow" mode)
+     * @return true if should read now
+     */
+    bool shouldRead(int flowInterval = 0);
 
 protected:
     std::string _mqttTopic;
     std::string _influxMeasurement;
-    int _readInterval;
+    int _readInterval;           // -1 = follow flow, >0 = custom interval in seconds
     bool _mqttEnabled;
     bool _influxEnabled;
     time_t _lastRead = 0;
-    
-    /**
-     * @brief Check if it's time to read the sensor
-     * @return true if should read now
-     */
-    bool shouldRead() {
-        return (time(nullptr) - _lastRead) >= _readInterval;
-    }
 };
 
 /**
@@ -75,8 +74,9 @@ public:
     
     /**
      * @brief Update all sensors (read if interval elapsed, publish if needed)
+     * @param flowInterval Current flow interval for "follow flow" mode (in seconds)
      */
-    void update();
+    void update(int flowInterval = 0);
     
     /**
      * @brief Clean up and deinitialize all sensors
@@ -108,6 +108,15 @@ private:
      * @return true if successful, false otherwise
      */
     bool initI2C(int sda, int scl, uint32_t freq);
+    
+    /**
+     * @brief Scan GPIO configuration to find sensor pins
+     * @param configFile Path to config.ini file
+     * @param sdaPin Output: SDA pin number (-1 if not found)
+     * @param sclPin Output: SCL pin number (-1 if not found)
+     * @param onewirePin Output: 1-Wire pin number (-1 if not found)
+     */
+    void scanGPIOConfig(const std::string& configFile, int& sdaPin, int& sclPin, int& onewirePin);
 };
 
 #endif // SENSOR_MANAGER_H

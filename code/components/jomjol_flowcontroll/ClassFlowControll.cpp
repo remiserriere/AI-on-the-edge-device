@@ -77,7 +77,8 @@ std::string ClassFlowControll::doSingleStep(std::string _stepname, std::string _
         }
     #endif //ENABLE_WEBHOOK
 
-    if ((_stepname.compare("[Sensors]") == 0) || (_stepname.compare(";[Sensors]") == 0)) {
+    if ((_stepname.compare("[SHT3x]") == 0) || (_stepname.compare(";[SHT3x]") == 0) ||
+        (_stepname.compare("[DS18B20]") == 0) || (_stepname.compare(";[DS18B20]") == 0)) {
         _classname = "ClassFlowSensors";
     }
 
@@ -285,7 +286,7 @@ ClassFlow* ClassFlowControll::CreateClassFlow(std::string _type)
         }
     #endif //ENABLE_WEBHOOK
 
-    if (toUpper(_type).compare("[SENSORS]") == 0) {
+    if (toUpper(_type).compare("[SHT3X]") == 0 || toUpper(_type).compare("[DS18B20]") == 0) {
         cfc = new ClassFlowSensors(&FlowControll);
     }
 
