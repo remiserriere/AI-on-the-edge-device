@@ -77,6 +77,11 @@ std::string ClassFlowControll::doSingleStep(std::string _stepname, std::string _
         }
     #endif //ENABLE_WEBHOOK
 
+    if ((_stepname.compare("[SHT3x]") == 0) || (_stepname.compare(";[SHT3x]") == 0) ||
+        (_stepname.compare("[DS18B20]") == 0) || (_stepname.compare(";[DS18B20]") == 0)) {
+        _classname = "ClassFlowSensors";
+    }
+
     for (int i = 0; i < FlowControll.size(); ++i) {
         if (FlowControll[i]->name().compare(_classname) == 0) {
             if (!(FlowControll[i]->name().compare("ClassFlowTakeImage") == 0)) {
@@ -128,6 +133,10 @@ std::string ClassFlowControll::TranslateAktstatus(std::string _input)
             return ("Sending Webhook");
         }
     #endif //ENABLE_WEBHOOK
+	
+    if (_input.compare("ClassFlowSensors") == 0) {
+        return ("Reading Sensors");
+    }
 	
     if (_input.compare("ClassFlowPostProcessing") == 0) {
         return ("Post-Processing");
@@ -276,6 +285,10 @@ ClassFlow* ClassFlowControll::CreateClassFlow(std::string _type)
             cfc = new ClassFlowWebhook(&FlowControll);
         }
     #endif //ENABLE_WEBHOOK
+
+    if (toUpper(_type).compare("[SHT3X]") == 0 || toUpper(_type).compare("[DS18B20]") == 0) {
+        cfc = new ClassFlowSensors(&FlowControll);
+    }
 
     if (toUpper(_type).compare("[POSTPROCESSING]") == 0) {
         cfc = new ClassFlowPostProcessing(&FlowControll, flowanalog, flowdigit); 

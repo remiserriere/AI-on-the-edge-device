@@ -1443,6 +1443,201 @@
             <td>$TOOLTIP_Webhook_UploadImg</td>
         </tr>
 
+
+        <!------------- SENSORS ------------------>
+        <tr style="border-bottom: 2px solid lightgray;">
+            <td colspan="3" style="padding-left: 0px; padding-bottom: 3px;">
+                <h4>External Sensors (Health & Safety Monitoring)</h4>
+                <p style="font-size: 0.9em; color: #666;">Monitor enclosure conditions to prevent device failure. Useful for outdoor installations.</p>
+            </td>
+        </tr>
+
+        <!------------- SHT3x Sensor ------------------>
+        <tr style="border-bottom: 2px solid lightgray;">
+            <td colspan="3" style="padding-left: 0px; padding-bottom: 3px;">
+                <h4>
+                <input type="checkbox" id="Category_SHT3x_enabled" value="1"  onclick = 'UpdateAfterCategoryCheck()' unchecked >
+                <label for=Category_SHT3x_enabled>SHT3x (Temperature & Humidity Sensor)</label>
+                </h4>
+            </td>
+        </tr>
+
+        <tr class="SHT3xItem">
+            <td class="indent1">
+                <input type="checkbox" id="SHT3x_Enable_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "Enable")' unchecked >
+                <label for=SHT3x_Enable_enabled><class id="SHT3x_Enable_text" style="color:black;">Enable SHT3x</class></label>
+            </td>
+            <td>
+                <select id="SHT3x_Enable_value1">
+                    <option value="false">Disabled</option>
+                    <option value="true">Enabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_SHT3x_Enable</td>
+        </tr>
+
+        <tr class="SHT3xItem">
+            <td class="indent1">
+                <input type="checkbox" id="SHT3x_Address_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "Address")' unchecked >
+                <label for=SHT3x_Address_enabled><class id="SHT3x_Address_text" style="color:black;">I²C Address</class></label>
+            </td>
+            <td>
+                <select id="SHT3x_Address_value1">
+                    <option value="0x44">0x44 (default)</option>
+                    <option value="0x45">0x45</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_SHT3x_Address</td>
+        </tr>
+
+        <tr class="SHT3xItem">
+            <td class="indent1">
+                <input type="checkbox" id="SHT3x_Interval_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "Interval")' unchecked >
+                <label for=SHT3x_Interval_enabled><class id="SHT3x_Interval_text" style="color:black;">Read Interval (seconds)</class></label>
+            </td>
+            <td>
+                <input type="number" id="SHT3x_Interval_value1" min="-1" step="1" value="-1">
+                <span style="font-size: 0.9em; color: #666;">(-1 = follow flow cycle)</span>
+            </td>
+            <td>$TOOLTIP_SHT3x_Interval</td>
+        </tr>
+
+        <tr class="SHT3xItem">
+            <td class="indent1">
+                <input type="checkbox" id="SHT3x_I2C_Frequency_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "I2C_Frequency")' unchecked >
+                <label for=SHT3x_I2C_Frequency_enabled><class id="SHT3x_I2C_Frequency_text" style="color:black;">I²C Frequency (Hz)</class></label>
+            </td>
+            <td>
+                <input type="number" id="SHT3x_I2C_Frequency_value1" value="100000">
+            </td>
+            <td>$TOOLTIP_SHT3x_I2C_Frequency</td>
+        </tr>
+
+        <tr class="SHT3xItem">
+            <td class="indent1">
+                <input type="checkbox" id="SHT3x_MQTT_Enable_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "MQTT_Enable")' unchecked >
+                <label for=SHT3x_MQTT_Enable_enabled><class id="SHT3x_MQTT_Enable_text" style="color:black;">Enable MQTT</class></label>
+            </td>
+            <td>
+                <input type="checkbox" id="SHT3x_MQTT_Enable_value1" checked>
+            </td>
+            <td>$TOOLTIP_SHT3x_MQTT_Enable</td>
+        </tr>
+
+        <tr class="SHT3xItem">
+            <td class="indent1">
+                <input type="checkbox" id="SHT3x_MQTT_Topic_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "MQTT_Topic")' unchecked >
+                <label for=SHT3x_MQTT_Topic_enabled><class id="SHT3x_MQTT_Topic_text" style="color:black;">MQTT Topic</class></label>
+            </td>
+            <td>
+                <input type="text" id="SHT3x_MQTT_Topic_value1" value="enclosure/climate">
+            </td>
+            <td>$TOOLTIP_SHT3x_MQTT_Topic</td>
+        </tr>
+
+        <tr class="SHT3xItem">
+            <td class="indent1">
+                <input type="checkbox" id="SHT3x_InfluxDB_Enable_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "InfluxDB_Enable")' unchecked >
+                <label for=SHT3x_InfluxDB_Enable_enabled><class id="SHT3x_InfluxDB_Enable_text" style="color:black;">Enable InfluxDB</class></label>
+            </td>
+            <td>
+                <input type="checkbox" id="SHT3x_InfluxDB_Enable_value1">
+            </td>
+            <td>$TOOLTIP_SHT3x_InfluxDB_Enable</td>
+        </tr>
+
+        <tr class="SHT3xItem">
+            <td class="indent1">
+                <input type="checkbox" id="SHT3x_InfluxDB_Measurement_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "InfluxDB_Measurement")' unchecked >
+                <label for=SHT3x_InfluxDB_Measurement_enabled><class id="SHT3x_InfluxDB_Measurement_text" style="color:black;">InfluxDB Measurement</class></label>
+            </td>
+            <td>
+                <input type="text" id="SHT3x_InfluxDB_Measurement_value1" value="environment">
+            </td>
+            <td>$TOOLTIP_SHT3x_InfluxDB_Measurement</td>
+        </tr>
+
+        <!------------- DS18B20 Sensor ------------------>
+        <tr style="border-bottom: 2px solid lightgray;">
+            <td colspan="3" style="padding-left: 0px; padding-bottom: 3px;">
+                <h4>
+                <input type="checkbox" id="Category_DS18B20_enabled" value="1"  onclick = 'UpdateAfterCategoryCheck()' unchecked >
+                <label for=Category_DS18B20_enabled>DS18B20 (Temperature Sensor - Chainable)</label>
+                </h4>
+                <p style="font-size: 0.9em; color: #666;">Multiple DS18B20 sensors can be chained on same wire. Each sensor is identified by unique ROM ID.</p>
+            </td>
+        </tr>
+
+        <tr class="DS18B20Item">
+            <td class="indent1">
+                <input type="checkbox" id="DS18B20_Enable_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "Enable")' unchecked >
+                <label for=DS18B20_Enable_enabled><class id="DS18B20_Enable_text" style="color:black;">Enable DS18B20</class></label>
+            </td>
+            <td>
+                <select id="DS18B20_Enable_value1">
+                    <option value="false">Disabled</option>
+                    <option value="true">Enabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_DS18B20_Enable</td>
+        </tr>
+
+        <tr class="DS18B20Item">
+            <td class="indent1">
+                <input type="checkbox" id="DS18B20_Interval_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "Interval")' unchecked >
+                <label for=DS18B20_Interval_enabled><class id="DS18B20_Interval_text" style="color:black;">Read Interval (seconds)</class></label>
+            </td>
+            <td>
+                <input type="number" id="DS18B20_Interval_value1" min="-1" step="1" value="-1">
+                <span style="font-size: 0.9em; color: #666;">(-1 = follow flow cycle)</span>
+            </td>
+            <td>$TOOLTIP_DS18B20_Interval</td>
+        </tr>
+
+        <tr class="DS18B20Item">
+            <td class="indent1">
+                <input type="checkbox" id="DS18B20_MQTT_Enable_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "MQTT_Enable")' unchecked >
+                <label for=DS18B20_MQTT_Enable_enabled><class id="DS18B20_MQTT_Enable_text" style="color:black;">Enable MQTT</class></label>
+            </td>
+            <td>
+                <input type="checkbox" id="DS18B20_MQTT_Enable_value1" checked>
+            </td>
+            <td>$TOOLTIP_DS18B20_MQTT_Enable</td>
+        </tr>
+
+        <tr class="DS18B20Item">
+            <td class="indent1">
+                <input type="checkbox" id="DS18B20_MQTT_Topic_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "MQTT_Topic")' unchecked >
+                <label for=DS18B20_MQTT_Topic_enabled><class id="DS18B20_MQTT_Topic_text" style="color:black;">MQTT Topic</class></label>
+            </td>
+            <td>
+                <input type="text" id="DS18B20_MQTT_Topic_value1" value="enclosure/temperature">
+            </td>
+            <td>$TOOLTIP_DS18B20_MQTT_Topic</td>
+        </tr>
+
+        <tr class="DS18B20Item">
+            <td class="indent1">
+                <input type="checkbox" id="DS18B20_InfluxDB_Enable_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "InfluxDB_Enable")' unchecked >
+                <label for=DS18B20_InfluxDB_Enable_enabled><class id="DS18B20_InfluxDB_Enable_text" style="color:black;">Enable InfluxDB</class></label>
+            </td>
+            <td>
+                <input type="checkbox" id="DS18B20_InfluxDB_Enable_value1">
+            </td>
+            <td>$TOOLTIP_DS18B20_InfluxDB_Enable</td>
+        </tr>
+
+        <tr class="DS18B20Item">
+            <td class="indent1">
+                <input type="checkbox" id="DS18B20_InfluxDB_Measurement_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "InfluxDB_Measurement")' unchecked >
+                <label for=DS18B20_InfluxDB_Measurement_enabled><class id="DS18B20_InfluxDB_Measurement_text" style="color:black;">InfluxDB Measurement</class></label>
+            </td>
+            <td>
+                <input type="text" id="DS18B20_InfluxDB_Measurement_value1" value="environment">
+            </td>
+            <td>$TOOLTIP_DS18B20_InfluxDB_Measurement</td>
+        </tr>
+
         <!------------- GPIO ------------------>
         <tr style="border-bottom: 2px solid lightgray;">
             <td colspan="3" style="padding-left: 0px; padding-bottom: 3px;">
@@ -1530,10 +1725,14 @@
             </td>
             <td>
                 <select id="GPIO_IO1_value1">
+                    <option value="disabled">disabled</option>
                     <option value="input">input</option>
                     <option value="input-pullup">input pullup</option>
                     <option value="input-pulldown">input pulldown</option>
                     <option value="output">output</option>
+                    <option value="i2c-sda">I²C SDA (SHT3x)</option>
+                    <option value="i2c-scl">I²C SCL (SHT3x)</option>
+                    <option value="onewire">1-Wire (DS18B20)</option>
                 </select>
             </td>
             <td>$TOOLTIP_GPIO_IO1</td>
@@ -1601,10 +1800,14 @@
             </td>
             <td>
                 <select id="GPIO_IO3_value1">
+                    <option value="disabled">disabled</option>
                     <option value="input">input</option>
                     <option value="input-pullup">input pullup</option>
                     <option value="input-pulldown">input pulldown</option>
                     <option value="output">output</option>
+                    <option value="i2c-sda">I²C SDA (SHT3x)</option>
+                    <option value="i2c-scl">I²C SCL (SHT3x)</option>
+                    <option value="onewire">1-Wire (DS18B20)</option>
                 </select>
             </td>
             <td>$TOOLTIP_GPIO_IO3</td>
@@ -1753,6 +1956,7 @@
             </td>
             <td>
                 <select id="GPIO_IO12_value1">
+                    <option value="disabled">disabled</option>
                     <option value="input">input</option>
                     <option value="input-pullup">input pullup</option>
                     <option value="input-pulldown">input pulldown</option>
@@ -1760,6 +1964,9 @@
                     <!-- <option value="output-pwm">output-pwm</option> -->
                     <!-- <option value="external-flash-pwm">external-flash-pwm</option> -->				
                     <option value="external-flash-ws281x">external flash light ws281x controlled</option>
+                    <option value="i2c-sda">I²C SDA (SHT3x)</option>
+                    <option value="i2c-scl">I²C SCL (SHT3x)</option>
+                    <option value="onewire">1-Wire (DS18B20)</option>
                 </select>
             </td>
             <td>$TOOLTIP_GPIO_IO12</td>
@@ -1883,10 +2090,14 @@
             </td>
             <td>
                 <select id="GPIO_IO13_value1">
+                    <option value="disabled">disabled</option>
                     <option value="input">input</option>
                     <option value="input-pullup">input pullup</option>
                     <option value="input-pulldown">input pulldown</option>
                     <option value="output">output</option>
+                    <option value="i2c-sda">I²C SDA (SHT3x)</option>
+                    <option value="i2c-scl">I²C SCL (SHT3x)</option>
+                    <option value="onewire">1-Wire (DS18B20)</option>
                 </select>
             </td>
             <td>$TOOLTIP_GPIO_IO13</td>

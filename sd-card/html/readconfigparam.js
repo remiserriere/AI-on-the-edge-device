@@ -238,6 +238,32 @@ function ParseConfig() {
     ParamAddValue(param, catname, "ApiKey");
     ParamAddValue(param, catname, "UploadImg");
 
+    var catname = "SHT3x";
+    category[catname] = new Object();
+    category[catname]["enabled"] = false;
+    category[catname]["found"] = false;
+    param[catname] = new Object();
+    ParamAddValue(param, catname, "Enable");
+    ParamAddValue(param, catname, "Address");
+    ParamAddValue(param, catname, "Interval");
+    ParamAddValue(param, catname, "I2C_Frequency");
+    ParamAddValue(param, catname, "MQTT_Enable");
+    ParamAddValue(param, catname, "MQTT_Topic");
+    ParamAddValue(param, catname, "InfluxDB_Enable");
+    ParamAddValue(param, catname, "InfluxDB_Measurement");
+    
+    var catname = "DS18B20";
+    category[catname] = new Object();
+    category[catname]["enabled"] = false;
+    category[catname]["found"] = false;
+    param[catname] = new Object();
+    ParamAddValue(param, catname, "Enable");
+    ParamAddValue(param, catname, "Interval");
+    ParamAddValue(param, catname, "MQTT_Enable");
+    ParamAddValue(param, catname, "MQTT_Topic");
+    ParamAddValue(param, catname, "InfluxDB_Enable");
+    ParamAddValue(param, catname, "InfluxDB_Measurement");
+
     var catname = "GPIO";
     category[catname] = new Object();
     category[catname]["enabled"] = false;
