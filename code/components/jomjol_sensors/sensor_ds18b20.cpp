@@ -31,7 +31,7 @@ SensorDS18B20::SensorDS18B20(gpio_num_t gpio,
                              int interval,
                              bool mqttEnabled,
                              bool influxEnabled)
-    : _gpio(gpio), _busHandle(nullptr), _initialized(false)
+    : _gpio(gpio), _initialized(false)
 {
     _mqttTopic = mqttTopic;
     _influxMeasurement = influxMeasurement;
@@ -269,8 +269,8 @@ float SensorDS18B20::getTemperature(int index) const
 
 int SensorDS18B20::scanDevices()
 {
-    // For simplicity, we'll use single-device mode
-    // Multiple device support would require implementing ROM search algorithm
+    // Simple implementation: return count of detected sensors
+    // Future enhancement: implement full ROM search algorithm for multiple sensors
     return _temperatures.size();
 }
 

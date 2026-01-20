@@ -299,7 +299,7 @@ bool SensorManager::readConfig(const std::string& configFile)
         return true;  // Not an error, just disabled
     }
     
-    // Initialize I2C if SHT3x is enabled and pins are configured
+    // Create sensor instances
     if (sht3xEnable && sdaPin >= 0 && sclPin >= 0) {
         if (!initI2C(sdaPin, sclPin, i2cFreq)) {
             LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to initialize I2C bus");
@@ -315,7 +315,10 @@ bool SensorManager::readConfig(const std::string& configFile)
             sht3xInfluxEnable
         );
         _sensors.push_back(std::move(sensor));
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Created SHT3x sensor (addr:0x" + intToHexString(sht3xAddress) + 
+        
+        std::stringstream ss;
+        ss << "0x" << std::hex << (int)sht3xAddress;
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Created SHT3x sensor (addr:" + ss.str() + 
                             ", interval:" + (sht3xInterval < 0 ? "follow flow" : std::to_string(sht3xInterval) + "s") + ")");
     } else if (sht3xEnable) {
         LogFile.WriteToFile(ESP_LOG_WARN, TAG, "SHT3x enabled but I2C pins not configured in GPIO section");

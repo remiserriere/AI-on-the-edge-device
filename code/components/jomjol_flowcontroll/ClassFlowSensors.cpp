@@ -100,8 +100,9 @@ bool ClassFlowSensors::doFlow(std::string time)
     }
     
     // Update sensors (read and publish if interval elapsed)
-    // Pass 0 as flowInterval - sensors with interval=-1 will use their own timer
-    _sensorManager->update(0);
+    // For "follow flow" mode, sensors check their own interval
+    // Passing 1 as a dummy value since sensors manage their own timing
+    _sensorManager->update(1);
     
     return true;
 }
