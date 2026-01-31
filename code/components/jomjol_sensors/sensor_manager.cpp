@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <cerrno>
 #include <climits>
+#include <cstdint>
 
 #include "driver/i2c.h"
 
@@ -40,7 +41,7 @@ static bool safeParseInt(const std::string& str, int& result) {
 }
 
 // Helper function to safely parse unsigned long without exceptions
-static bool safeParseULong(const std::string& str, unsigned long& result, int base = 0) {
+static bool safeParseULong(const std::string& str, unsigned long& result, int base = 10) {
     if (str.empty()) {
         return false;
     }
@@ -309,7 +310,7 @@ bool SensorManager::readConfig(const std::string& configFile)
                 sht3xEnable = (toUpper(value) == "TRUE" || value == "1");
             } else if (param == "ADDRESS") {
                 unsigned long tempAddress;
-                if (safeParseULong(value, tempAddress, 0)) {
+                if (safeParseULong(value, tempAddress, 0) && tempAddress <= 0xFF) {
                     sht3xAddress = static_cast<uint8_t>(tempAddress);
                 } else {
                     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Invalid SHT3x address value: " + value);
@@ -320,7 +321,7 @@ bool SensorManager::readConfig(const std::string& configFile)
                 }
             } else if (param == "I2C_FREQUENCY") {
                 unsigned long tempFreq;
-                if (safeParseULong(value, tempFreq, 10)) {
+                if (safeParseULong(value, tempFreq, 10) && tempFreq <= UINT32_MAX) {
                     i2cFreq = static_cast<uint32_t>(tempFreq);
                 } else {
                     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Invalid I2C frequency value: " + value);
