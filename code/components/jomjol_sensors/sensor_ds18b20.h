@@ -38,7 +38,7 @@ public:
     /**
      * @brief Get number of detected sensors on the bus
      */
-    int getSensorCount() const { return _temperatures.size(); }
+    int getSensorCount() const;
     
     /**
      * @brief Get temperature reading for specific sensor
@@ -64,7 +64,6 @@ private:
      * @return true if successful
      */
     bool readOneSensor(float& temp);
-};
 };
 
 #endif // SENSOR_DS18B20_H
