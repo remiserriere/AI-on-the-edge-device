@@ -11,6 +11,13 @@
 static const char *TAG = "INFLUXDB";
 
 /**
+ * @brief Global InfluxDB instance for sensor publishing.
+ * 
+ * This global instance is used by sensor components to publish data to InfluxDB.
+ */
+InfluxDB influxDB;
+
+/**
  * @brief Buffer to store the HTTP response.
  * 
  * This character array is used to store the output of an HTTP response.
