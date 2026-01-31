@@ -310,6 +310,7 @@ bool SensorManager::readConfig(const std::string& configFile)
                 sht3xEnable = (toUpper(value) == "TRUE" || value == "1");
             } else if (param == "ADDRESS") {
                 unsigned long tempAddress;
+                // Use base 0 to auto-detect format (supports both 0x44 hex and 68 decimal)
                 if (safeParseULong(value, tempAddress, 0) && tempAddress <= 0xFF) {
                     sht3xAddress = static_cast<uint8_t>(tempAddress);
                 } else {
@@ -321,6 +322,7 @@ bool SensorManager::readConfig(const std::string& configFile)
                 }
             } else if (param == "I2C_FREQUENCY") {
                 unsigned long tempFreq;
+                // Range check is meaningful on 64-bit platforms where unsigned long > 32-bit
                 if (safeParseULong(value, tempFreq, 10) && tempFreq <= UINT32_MAX) {
                     i2cFreq = static_cast<uint32_t>(tempFreq);
                 } else {
