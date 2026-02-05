@@ -432,7 +432,7 @@ std::string SensorManager::getJSON()
         
         // Add sensor-specific data
         if (sensor->getName() == "SHT3x") {
-            auto* sht3x = dynamic_cast<SensorSHT3x*>(sensor.get());
+            auto* sht3x = static_cast<SensorSHT3x*>(sensor.get());
             if (sht3x) {
                 json << ",\"temperature\":" << sht3x->getTemperature();
                 json << ",\"humidity\":" << sht3x->getHumidity();
@@ -440,7 +440,7 @@ std::string SensorManager::getJSON()
                 json << ",\"unit_humidity\":\"%\"";
             }
         } else if (sensor->getName() == "DS18B20") {
-            auto* ds18b20 = dynamic_cast<SensorDS18B20*>(sensor.get());
+            auto* ds18b20 = static_cast<SensorDS18B20*>(sensor.get());
             if (ds18b20) {
                 int count = ds18b20->getSensorCount();
                 json << ",\"count\":" << count;
