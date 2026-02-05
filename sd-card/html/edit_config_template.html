@@ -1463,24 +1463,7 @@
         </tr>
 
         <tr class="SHT3xItem">
-            <td class="indent1">
-                <input type="checkbox" id="SHT3x_Enable_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "Enable")' unchecked >
-                <label for=SHT3x_Enable_enabled><class id="SHT3x_Enable_text" style="color:black;">Enable SHT3x</class></label>
-            </td>
-            <td>
-                <select id="SHT3x_Enable_value1">
-                    <option value="false">Disabled</option>
-                    <option value="true">Enabled</option>
-                </select>
-            </td>
-            <td>$TOOLTIP_SHT3x_Enable</td>
-        </tr>
-
-        <tr class="SHT3xItem">
-            <td class="indent1">
-                <input type="checkbox" id="SHT3x_Address_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "Address")' unchecked >
-                <label for=SHT3x_Address_enabled><class id="SHT3x_Address_text" style="color:black;">I²C Address</class></label>
-            </td>
+            <td class="indent1">I²C Address</td>
             <td>
                 <select id="SHT3x_Address_value1">
                     <option value="0x44">0x44 (default)</option>
@@ -1491,10 +1474,7 @@
         </tr>
 
         <tr class="SHT3xItem">
-            <td class="indent1">
-                <input type="checkbox" id="SHT3x_Interval_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "Interval")' unchecked >
-                <label for=SHT3x_Interval_enabled><class id="SHT3x_Interval_text" style="color:black;">Read Interval (seconds)</class></label>
-            </td>
+            <td class="indent1">Read Interval (seconds)</td>
             <td>
                 <input type="number" id="SHT3x_Interval_value1" min="-1" step="1" value="-1">
                 <span style="font-size: 0.9em; color: #666;">(-1 = follow flow cycle)</span>
@@ -1503,10 +1483,7 @@
         </tr>
 
         <tr class="SHT3xItem">
-            <td class="indent1">
-                <input type="checkbox" id="SHT3x_I2C_Frequency_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "I2C_Frequency")' unchecked >
-                <label for=SHT3x_I2C_Frequency_enabled><class id="SHT3x_I2C_Frequency_text" style="color:black;">I²C Frequency (Hz)</class></label>
-            </td>
+            <td class="indent1">I²C Frequency (Hz)</td>
             <td>
                 <input type="number" id="SHT3x_I2C_Frequency_value1" value="100000">
             </td>
@@ -1514,10 +1491,7 @@
         </tr>
 
         <tr class="SHT3xItem">
-            <td class="indent1">
-                <input type="checkbox" id="SHT3x_MQTT_Enable_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "MQTT_Enable")' unchecked >
-                <label for=SHT3x_MQTT_Enable_enabled><class id="SHT3x_MQTT_Enable_text" style="color:black;">Enable MQTT</class></label>
-            </td>
+            <td class="indent1">Enable MQTT</td>
             <td>
                 <input type="checkbox" id="SHT3x_MQTT_Enable_value1" checked>
             </td>
@@ -1525,10 +1499,7 @@
         </tr>
 
         <tr class="SHT3xItem">
-            <td class="indent1">
-                <input type="checkbox" id="SHT3x_MQTT_Topic_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "MQTT_Topic")' unchecked >
-                <label for=SHT3x_MQTT_Topic_enabled><class id="SHT3x_MQTT_Topic_text" style="color:black;">MQTT Topic</class></label>
-            </td>
+            <td class="indent1">MQTT Topic</td>
             <td>
                 <input type="text" id="SHT3x_MQTT_Topic_value1" value="enclosure/climate">
             </td>
@@ -1536,10 +1507,7 @@
         </tr>
 
         <tr class="SHT3xItem">
-            <td class="indent1">
-                <input type="checkbox" id="SHT3x_InfluxDB_Enable_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "InfluxDB_Enable")' unchecked >
-                <label for=SHT3x_InfluxDB_Enable_enabled><class id="SHT3x_InfluxDB_Enable_text" style="color:black;">Enable InfluxDB</class></label>
-            </td>
+            <td class="indent1">Enable InfluxDB</td>
             <td>
                 <input type="checkbox" id="SHT3x_InfluxDB_Enable_value1">
             </td>
@@ -1547,10 +1515,7 @@
         </tr>
 
         <tr class="SHT3xItem">
-            <td class="indent1">
-                <input type="checkbox" id="SHT3x_InfluxDB_Measurement_enabled" value="1"  onclick = 'InvertEnableItem("SHT3x", "InfluxDB_Measurement")' unchecked >
-                <label for=SHT3x_InfluxDB_Measurement_enabled><class id="SHT3x_InfluxDB_Measurement_text" style="color:black;">InfluxDB Measurement</class></label>
-            </td>
+            <td class="indent1">InfluxDB Measurement</td>
             <td>
                 <input type="text" id="SHT3x_InfluxDB_Measurement_value1" value="environment">
             </td>
@@ -1569,24 +1534,7 @@
         </tr>
 
         <tr class="DS18B20Item">
-            <td class="indent1">
-                <input type="checkbox" id="DS18B20_Enable_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "Enable")' unchecked >
-                <label for=DS18B20_Enable_enabled><class id="DS18B20_Enable_text" style="color:black;">Enable DS18B20</class></label>
-            </td>
-            <td>
-                <select id="DS18B20_Enable_value1">
-                    <option value="false">Disabled</option>
-                    <option value="true">Enabled</option>
-                </select>
-            </td>
-            <td>$TOOLTIP_DS18B20_Enable</td>
-        </tr>
-
-        <tr class="DS18B20Item">
-            <td class="indent1">
-                <input type="checkbox" id="DS18B20_Interval_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "Interval")' unchecked >
-                <label for=DS18B20_Interval_enabled><class id="DS18B20_Interval_text" style="color:black;">Read Interval (seconds)</class></label>
-            </td>
+            <td class="indent1">Read Interval (seconds)</td>
             <td>
                 <input type="number" id="DS18B20_Interval_value1" min="-1" step="1" value="-1">
                 <span style="font-size: 0.9em; color: #666;">(-1 = follow flow cycle)</span>
@@ -1595,10 +1543,7 @@
         </tr>
 
         <tr class="DS18B20Item">
-            <td class="indent1">
-                <input type="checkbox" id="DS18B20_MQTT_Enable_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "MQTT_Enable")' unchecked >
-                <label for=DS18B20_MQTT_Enable_enabled><class id="DS18B20_MQTT_Enable_text" style="color:black;">Enable MQTT</class></label>
-            </td>
+            <td class="indent1">Enable MQTT</td>
             <td>
                 <input type="checkbox" id="DS18B20_MQTT_Enable_value1" checked>
             </td>
@@ -1606,10 +1551,7 @@
         </tr>
 
         <tr class="DS18B20Item">
-            <td class="indent1">
-                <input type="checkbox" id="DS18B20_MQTT_Topic_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "MQTT_Topic")' unchecked >
-                <label for=DS18B20_MQTT_Topic_enabled><class id="DS18B20_MQTT_Topic_text" style="color:black;">MQTT Topic</class></label>
-            </td>
+            <td class="indent1">MQTT Topic</td>
             <td>
                 <input type="text" id="DS18B20_MQTT_Topic_value1" value="enclosure/temperature">
             </td>
@@ -1617,10 +1559,7 @@
         </tr>
 
         <tr class="DS18B20Item">
-            <td class="indent1">
-                <input type="checkbox" id="DS18B20_InfluxDB_Enable_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "InfluxDB_Enable")' unchecked >
-                <label for=DS18B20_InfluxDB_Enable_enabled><class id="DS18B20_InfluxDB_Enable_text" style="color:black;">Enable InfluxDB</class></label>
-            </td>
+            <td class="indent1">Enable InfluxDB</td>
             <td>
                 <input type="checkbox" id="DS18B20_InfluxDB_Enable_value1">
             </td>
@@ -1628,10 +1567,7 @@
         </tr>
 
         <tr class="DS18B20Item">
-            <td class="indent1">
-                <input type="checkbox" id="DS18B20_InfluxDB_Measurement_enabled" value="1"  onclick = 'InvertEnableItem("DS18B20", "InfluxDB_Measurement")' unchecked >
-                <label for=DS18B20_InfluxDB_Measurement_enabled><class id="DS18B20_InfluxDB_Measurement_text" style="color:black;">InfluxDB Measurement</class></label>
-            </td>
+            <td class="indent1">InfluxDB Measurement</td>
             <td>
                 <input type="text" id="DS18B20_InfluxDB_Measurement_value1" value="environment">
             </td>
@@ -2517,6 +2453,12 @@ function UpdateInput() {
     document.getElementById("Category_Webhook_enabled").checked = category["Webhook"]["enabled"];
     setVisible("WebhookItem", category["Webhook"]["enabled"]);
 
+    document.getElementById("Category_SHT3x_enabled").checked = category["SHT3x"]["enabled"];
+    setVisible("SHT3xItem", category["SHT3x"]["enabled"]);
+
+    document.getElementById("Category_DS18B20_enabled").checked = category["DS18B20"]["enabled"];
+    setVisible("DS18B20Item", category["DS18B20"]["enabled"]);
+
     WriteParameter(param, category, "TakeImage", "RawImagesLocation", true);
     WriteParameter(param, category, "TakeImage", "RawImagesRetention", true);
 
@@ -2684,6 +2626,18 @@ function ReadParameterAll() {
     category["InfluxDBv2"]["enabled"] = document.getElementById("Category_InfluxDBv2_enabled").checked;
     category["Webhook"]["enabled"] = document.getElementById("Category_Webhook_enabled").checked;
     category["GPIO"]["enabled"] = document.getElementById("Category_GPIO_enabled").checked;
+    category["SHT3x"]["enabled"] = document.getElementById("Category_SHT3x_enabled").checked;
+    category["DS18B20"]["enabled"] = document.getElementById("Category_DS18B20_enabled").checked;
+
+    // Auto-set Enable parameter for sensors based on category checkbox
+    if (param["SHT3x"] && param["SHT3x"]["Enable"]) {
+        param["SHT3x"]["Enable"]["enabled"] = true;
+        param["SHT3x"]["Enable"]["value1"] = category["SHT3x"]["enabled"] ? "true" : "false";
+    }
+    if (param["DS18B20"] && param["DS18B20"]["Enable"]) {
+        param["DS18B20"]["Enable"]["enabled"] = true;
+        param["DS18B20"]["Enable"]["value1"] = category["DS18B20"]["enabled"] ? "true" : "false";
+    }
 
     ReadParameter(param, "TakeImage", "RawImagesLocation", true);
     ReadParameter(param, "TakeImage", "RawImagesRetention", true);
@@ -2804,6 +2758,21 @@ function ReadParameterAll() {
     ReadParameter(param, "System", "RSSIThreshold", true);
     ReadParameter(param, "System", "CPUFrequency", true);
 
+    // Sensor parameters
+    ReadParameter(param, "SHT3x", "Address", false);
+    ReadParameter(param, "SHT3x", "Interval", false);
+    ReadParameter(param, "SHT3x", "I2C_Frequency", false);
+    ReadParameter(param, "SHT3x", "MQTT_Enable", false);
+    ReadParameter(param, "SHT3x", "MQTT_Topic", false);
+    ReadParameter(param, "SHT3x", "InfluxDB_Enable", false);
+    ReadParameter(param, "SHT3x", "InfluxDB_Measurement", false);
+
+    ReadParameter(param, "DS18B20", "Interval", false);
+    ReadParameter(param, "DS18B20", "MQTT_Enable", false);
+    ReadParameter(param, "DS18B20", "MQTT_Topic", false);
+    ReadParameter(param, "DS18B20", "InfluxDB_Enable", false);
+    ReadParameter(param, "DS18B20", "InfluxDB_Measurement", false);
+
     var sel = document.getElementById("Numbers_value1");
     UpdateInputIndividual(sel);
 
@@ -2819,6 +2788,8 @@ function UpdateAfterCategoryCheck() {
     category["InfluxDBv2"]["enabled"] = document.getElementById("Category_InfluxDBv2_enabled").checked;
     category["GPIO"]["enabled"] = document.getElementById("Category_GPIO_enabled").checked;
     category["Webhook"]["enabled"] = document.getElementById("Category_Webhook_enabled").checked;
+    category["SHT3x"]["enabled"] = document.getElementById("Category_SHT3x_enabled").checked;
+    category["DS18B20"]["enabled"] = document.getElementById("Category_DS18B20_enabled").checked;
 
     UpdateInput();
     var sel = document.getElementById("Numbers_value1");

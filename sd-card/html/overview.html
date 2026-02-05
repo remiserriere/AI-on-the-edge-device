@@ -126,6 +126,7 @@
 					<span id="uptime" ></span>
 					<span id="round" ></span>
 				</div>
+				<div id="sensors" style="margin-top: 10px;"></div>
 			</td>
 		</tr>
 	</table>
@@ -159,6 +160,7 @@
 			loadRSSI();
 			loadUptime();
 			loadRoundCounter();
+			loadSensors();
 		}
 
 		function LoadROIImage(){
@@ -271,6 +273,61 @@
 				if (this.readyState == 4 && this.status == 200) {
 					var _rsp = xhttp.responseText;
 					$('#round').html("(Round: " + _rsp + ")");
+				}
+			}
+			
+			xhttp.open("GET", url, true);
+			xhttp.send();
+		}
+
+		function loadSensors() {
+			url = domainname + '/sensors';     
+			var xhttp = new XMLHttpRequest();
+			xhttp.onreadystatechange = function() {
+				if (this.readyState == 4) {
+					if (this.status == 200) {
+						try {
+							var data = JSON.parse(xhttp.responseText);
+							var html = '';
+							
+							if (data.sensors && data.sensors.length > 0) {
+								html = '<div style="margin-top: 5px; padding-top: 5px; border-top: 1px solid #ddd;"><strong>Sensors:</strong><br>';
+								
+								data.sensors.forEach(function(sensor) {
+									var timestamp = new Date(sensor.last_read * 1000);
+									var timeStr = timestamp.toLocaleString();
+									
+									if (sensor.name === 'SHT3x') {
+										html += '<span style="display: inline-block; margin-right: 15px;">🌡️ ' + sensor.temperature.toFixed(1) + sensor.unit_temp + '</span>';
+										html += '<span style="display: inline-block; margin-right: 15px;">💧 ' + sensor.humidity.toFixed(1) + sensor.unit_humidity + '</span>';
+										html += '<span style="font-size: 0.85em; color: #666;">(' + timeStr + ')</span><br>';
+									} else if (sensor.name === 'DS18B20') {
+										html += '<span>🌡️ DS18B20: ';
+										if (sensor.count === 1) {
+											html += sensor.temperatures[0].toFixed(1) + sensor.unit;
+										} else {
+											sensor.temperatures.forEach(function(temp, idx) {
+												if (idx > 0) html += ', ';
+												html += temp.toFixed(1) + sensor.unit;
+											});
+										}
+										html += '</span>';
+										html += '<span style="font-size: 0.85em; color: #666;"> (' + timeStr + ')</span><br>';
+									}
+								});
+								
+								html += '</div>';
+							}
+							
+							$('#sensors').html(html);
+						} catch (e) {
+							// Silently ignore if sensors not available
+							$('#sensors').html('');
+						}
+					} else {
+						// No sensors or endpoint not available
+						$('#sensors').html('');
+					}
 				}
 			}
 			

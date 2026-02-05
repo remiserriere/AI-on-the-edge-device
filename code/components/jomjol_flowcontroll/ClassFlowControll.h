@@ -90,6 +90,8 @@ public:
 
 	int CleanTempFolder();
 
+	std::vector<ClassFlow*>* GetFlowControll() { return &FlowControll; }
+
 	string name(){return "ClassFlowControll";};
 };
 

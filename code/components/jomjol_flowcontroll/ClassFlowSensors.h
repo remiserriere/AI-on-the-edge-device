@@ -20,6 +20,12 @@ public:
     bool doFlow(std::string time) override;
     std::string name() override { return "ClassFlowSensors"; }
     
+    /**
+     * @brief Get sensor manager instance for accessing sensor data
+     * @return Pointer to sensor manager (nullptr if not initialized)
+     */
+    SensorManager* getSensorManager() { return _sensorManager.get(); }
+    
 protected:
     void SetInitialParameter(void) override;
     

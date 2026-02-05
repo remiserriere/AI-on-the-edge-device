@@ -48,6 +48,12 @@ public:
      * @return true if should read now
      */
     bool shouldRead(int flowInterval = 0);
+    
+    /**
+     * @brief Get timestamp of last successful read
+     * @return Unix timestamp
+     */
+    time_t getLastReadTime() const { return _lastRead; }
 
 protected:
     std::string _mqttTopic;
@@ -94,6 +100,18 @@ public:
      * @brief Check if sensor manager is enabled
      */
     bool isEnabled() { return _enabled; }
+    
+    /**
+     * @brief Get sensor data as JSON string
+     * @return JSON string with sensor readings and timestamps
+     */
+    std::string getJSON();
+    
+    /**
+     * @brief Get list of detected/enabled sensors
+     * @return Vector of sensor pointers
+     */
+    const std::vector<std::unique_ptr<SensorBase>>& getSensors() const { return _sensors; }
     
 private:
     std::vector<std::unique_ptr<SensorBase>> _sensors;
