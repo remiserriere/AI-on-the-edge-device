@@ -409,3 +409,59 @@ bool SensorManager::readConfig(const std::string& configFile)
     
     return true;
 }
+
+std::string SensorManager::getJSON()
+{
+    if (!_enabled || _sensors.empty()) {
+        return "{}";
+    }
+    
+    std::stringstream json;
+    json << "{";
+    json << "\"sensors\":[";
+    
+    bool first = true;
+    for (const auto& sensor : _sensors) {
+        if (!first) {
+            json << ",";
+        }
+        first = false;
+        
+        json << "{";
+        json << "\"name\":\"" << sensor->getName() << "\"";
+        
+        // Add sensor-specific data
+        if (sensor->getName() == "SHT3x") {
+            auto* sht3x = dynamic_cast<SensorSHT3x*>(sensor.get());
+            if (sht3x) {
+                json << ",\"temperature\":" << sht3x->getTemperature();
+                json << ",\"humidity\":" << sht3x->getHumidity();
+                json << ",\"unit_temp\":\"°C\"";
+                json << ",\"unit_humidity\":\"%\"";
+            }
+        } else if (sensor->getName() == "DS18B20") {
+            auto* ds18b20 = dynamic_cast<SensorDS18B20*>(sensor.get());
+            if (ds18b20) {
+                int count = ds18b20->getSensorCount();
+                json << ",\"count\":" << count;
+                json << ",\"temperatures\":[";
+                for (int i = 0; i < count; i++) {
+                    if (i > 0) json << ",";
+                    json << ds18b20->getTemperature(i);
+                }
+                json << "]";
+                json << ",\"unit\":\"°C\"";
+            }
+        }
+        
+        // Add last read timestamp
+        json << ",\"last_read\":" << sensor->getLastReadTime();
+        
+        json << "}";
+    }
+    
+    json << "]";
+    json << "}";
+    
+    return json.str();
+}
