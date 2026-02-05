@@ -19,6 +19,7 @@
 
 #include "ClassFlowControll.h"
 #include "ClassFlowSensors.h"
+#include "sensor_manager.h"
 
 #include "ClassLogFile.h"
 #include "server_GPIO.h"
