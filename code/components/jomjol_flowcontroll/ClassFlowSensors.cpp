@@ -6,23 +6,20 @@
 
 #include <sstream>
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
 static const char *TAG = "FLOW_SENSORS";
 
-ClassFlowSensors::ClassFlowSensors() : _initialized(false), _sensorTaskHandle(nullptr)
+ClassFlowSensors::ClassFlowSensors() : _initialized(false)
 {
     SetInitialParameter();
 }
 
-ClassFlowSensors::ClassFlowSensors(std::vector<ClassFlow*>* lfc) : _initialized(false), _sensorTaskHandle(nullptr)
+ClassFlowSensors::ClassFlowSensors(std::vector<ClassFlow*>* lfc) : _initialized(false)
 {
     SetInitialParameter();
     ListFlowControll = lfc;
 }
 
-ClassFlowSensors::ClassFlowSensors(std::vector<ClassFlow*>* lfc, ClassFlow *_prev) : _initialized(false), _sensorTaskHandle(nullptr)
+ClassFlowSensors::ClassFlowSensors(std::vector<ClassFlow*>* lfc, ClassFlow *_prev) : _initialized(false)
 {
     SetInitialParameter();
     previousElement = _prev;
@@ -31,7 +28,6 @@ ClassFlowSensors::ClassFlowSensors(std::vector<ClassFlow*>* lfc, ClassFlow *_pre
 
 ClassFlowSensors::~ClassFlowSensors()
 {
-    stopSensorUpdateTask();
     if (_sensorManager) {
         _sensorManager->deinit();
     }
@@ -43,7 +39,6 @@ void ClassFlowSensors::SetInitialParameter(void)
     _sensorManager = nullptr;
     _flowController = nullptr;
     _initialized = false;
-    _sensorTaskHandle = nullptr;
 }
 
 bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
@@ -104,9 +99,6 @@ bool ClassFlowSensors::doFlow(std::string time)
         }
         _initialized = true;
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sensors initialized successfully");
-        
-        // Start background task for periodic sensor updates (for custom intervals)
-        startSensorUpdateTask();
     }
     
     // Get the flow interval from the controller for "follow flow" mode
@@ -123,64 +115,9 @@ bool ClassFlowSensors::doFlow(std::string time)
         LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Flow controller not set, using default interval");
     }
     
-    // Update sensors (read and publish if interval elapsed)
-    // Pass the actual flow interval for "follow flow" mode sensors
+    // Update sensors that are in "follow flow" mode (interval = -1)
+    // Sensors with custom intervals are handled by their own periodic tasks
     _sensorManager->update(flowIntervalSeconds);
     
     return true;
-}
-
-// Background task for periodic sensor updates
-// This allows sensors with custom intervals shorter than flow interval to be read properly
-void ClassFlowSensors::sensorUpdateTask(void* pvParameters)
-{
-    ClassFlowSensors* self = static_cast<ClassFlowSensors*>(pvParameters);
-    
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sensor update task started");
-    
-    // Check sensors every 1 second
-    const TickType_t xDelay = 1000 / portTICK_PERIOD_MS;
-    
-    while (true) {
-        if (self->_sensorManager && self->_sensorManager->isEnabled()) {
-            // Pass 0 as flow interval - sensors will use their own custom intervals
-            self->_sensorManager->update(0);
-        }
-        
-        vTaskDelay(xDelay);
-    }
-}
-
-void ClassFlowSensors::startSensorUpdateTask()
-{
-    if (_sensorTaskHandle != nullptr) {
-        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Sensor update task already running");
-        return;
-    }
-    
-    BaseType_t xReturned = xTaskCreatePinnedToCore(
-        &ClassFlowSensors::sensorUpdateTask,
-        "sensor_update",
-        4096,  // Stack size
-        this,  // Parameter passed to task
-        tskIDLE_PRIORITY + 1,  // Priority (lower than main flow)
-        &_sensorTaskHandle,
-        0  // Core 0
-    );
-    
-    if (xReturned != pdPASS) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to create sensor update task");
-        _sensorTaskHandle = nullptr;
-    } else {
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sensor update task created successfully");
-    }
-}
-
-void ClassFlowSensors::stopSensorUpdateTask()
-{
-    if (_sensorTaskHandle != nullptr) {
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Stopping sensor update task");
-        vTaskDelete(_sensorTaskHandle);
-        _sensorTaskHandle = nullptr;
-    }
 }

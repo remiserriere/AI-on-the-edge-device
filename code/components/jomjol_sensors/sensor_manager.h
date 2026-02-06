@@ -7,6 +7,8 @@
 #include <vector>
 #include <memory>
 #include <time.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 /**
  * @brief Base class for all sensors
@@ -54,6 +56,23 @@ public:
      * @return Unix timestamp
      */
     time_t getLastReadTime() const { return _lastRead; }
+    
+    /**
+     * @brief Start periodic task for this sensor (for custom intervals)
+     * @return true if task started successfully
+     */
+    bool startPeriodicTask();
+    
+    /**
+     * @brief Stop periodic task for this sensor
+     */
+    void stopPeriodicTask();
+    
+    /**
+     * @brief Get the read interval for this sensor
+     * @return interval in seconds (-1 = follow flow, >0 = custom interval)
+     */
+    int getReadInterval() const { return _readInterval; }
 
 protected:
     std::string _mqttTopic;
@@ -62,6 +81,19 @@ protected:
     bool _mqttEnabled;
     bool _influxEnabled;
     time_t _lastRead = 0;
+    
+private:
+    TaskHandle_t _taskHandle = nullptr;
+    
+    /**
+     * @brief Static task function wrapper for FreeRTOS
+     */
+    static void sensorTaskWrapper(void* pvParameters);
+    
+    /**
+     * @brief Periodic task function for reading sensor
+     */
+    void sensorTask();
 };
 
 /**

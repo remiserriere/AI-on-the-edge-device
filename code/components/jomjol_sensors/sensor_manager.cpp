@@ -82,6 +82,78 @@ bool SensorBase::shouldRead(int flowInterval)
     return (now - _lastRead) >= interval;
 }
 
+void SensorBase::sensorTaskWrapper(void* pvParameters)
+{
+    SensorBase* sensor = static_cast<SensorBase*>(pvParameters);
+    sensor->sensorTask();
+}
+
+void SensorBase::sensorTask()
+{
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task started for sensor: " + getName() + 
+                        " (interval: " + std::to_string(_readInterval) + "s)");
+    
+    const TickType_t xDelay = (_readInterval * 1000) / portTICK_PERIOD_MS;
+    
+    while (true) {
+        // Read sensor data and publish
+        if (readData()) {
+            publishMQTT();
+            publishInfluxDB();
+        }
+        
+        vTaskDelay(xDelay);
+    }
+}
+
+bool SensorBase::startPeriodicTask()
+{
+    // Only create task if we have a custom interval (not follow flow mode)
+    if (_readInterval <= 0) {
+        return true;  // Not an error, just not applicable
+    }
+    
+    if (_taskHandle != nullptr) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Task already running for sensor: " + getName());
+        return true;
+    }
+    
+    std::string taskName = "sensor_" + getName();
+    // Truncate task name if too long (FreeRTOS limit is 16 chars)
+    if (taskName.length() > 15) {
+        taskName = taskName.substr(0, 15);
+    }
+    
+    BaseType_t xReturned = xTaskCreatePinnedToCore(
+        &SensorBase::sensorTaskWrapper,
+        taskName.c_str(),
+        4096,  // Stack size
+        this,  // Parameter passed to task
+        tskIDLE_PRIORITY + 1,  // Priority
+        &_taskHandle,
+        0  // Core 0
+    );
+    
+    if (xReturned != pdPASS) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to create periodic task for sensor: " + getName());
+        _taskHandle = nullptr;
+        return false;
+    }
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Created periodic task for sensor: " + getName() + 
+                        " (interval: " + std::to_string(_readInterval) + "s)");
+    return true;
+}
+
+void SensorBase::stopPeriodicTask()
+{
+    if (_taskHandle != nullptr) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Stopping periodic task for sensor: " + getName());
+        vTaskDelete(_taskHandle);
+        _taskHandle = nullptr;
+    }
+}
+
 SensorManager::SensorManager() : _enabled(false), _i2cInitialized(false)
 {
 }
@@ -107,6 +179,16 @@ bool SensorManager::init()
             allSuccess = false;
         } else {
             LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initialized sensor: " + sensor->getName());
+            
+            // Start periodic task for sensors with custom intervals (> 0)
+            if (sensor->getReadInterval() > 0) {
+                if (!sensor->startPeriodicTask()) {
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to start periodic task for sensor: " + sensor->getName());
+                    allSuccess = false;
+                }
+            } else {
+                LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sensor " + sensor->getName() + " will follow flow interval (no periodic task)");
+            }
         }
     }
     
@@ -131,6 +213,11 @@ void SensorManager::update(int flowInterval)
 
 void SensorManager::deinit()
 {
+    // Stop all periodic tasks before clearing sensors
+    for (auto& sensor : _sensors) {
+        sensor->stopPeriodicTask();
+    }
+    
     _sensors.clear();
     
     if (_i2cInitialized) {
