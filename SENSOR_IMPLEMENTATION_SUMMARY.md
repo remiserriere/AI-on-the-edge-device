@@ -297,7 +297,7 @@ Documentation:
 
 1. **1-Wire Blocking**: DS18B20 reading blocks for ~800ms (conversion + read time)
    - Impact: Minimal on typical 5-10 minute flow cycles
-   - Note: Custom intervals now properly supported via background task (fixed in latest version)
+   - Note: Each sensor with custom interval now runs in its own task (latest version)
 
 2. **GPIO Pins**: Limited to IO1, IO3, IO12, IO13
    - Impact: Other GPIOs may conflict with camera/SD
@@ -310,25 +310,46 @@ Documentation:
 
 ## Recent Improvements
 
-### Custom Interval Support (Latest Version)
+### Per-Sensor Task Architecture (Latest Version)
 
-**Problem Solved:** Previously, sensors with custom intervals shorter than the flow interval were not read at their specified rate.
+**Problem Solved:** Previously, a single background task ran every 1 second to check all sensors, which was not power efficient.
 
-**Solution:** Implemented a background FreeRTOS task that:
-- Runs every 1 second independently of main flow
-- Checks and reads sensors based on their individual intervals
-- Allows high-frequency monitoring (e.g., every 5 seconds) even with long flow intervals (e.g., 5 minutes)
-- Minimal performance impact (4KB memory, low CPU usage)
+**Solution:** Implemented per-sensor FreeRTOS tasks that:
+- Each sensor with a custom interval (> 0) gets its own dedicated task
+- Tasks run at the sensor's specific interval (e.g., 30 seconds, 5 minutes)
+- No unnecessary CPU wake-ups - tasks only run when needed
+- Sensors in "follow flow" mode (interval = -1) are updated during the main flow cycle
+- Minimal memory overhead per sensor (task handle + stack)
+- Proper cleanup on sensor deinitialization
 
-**Example:**
+**Architecture:**
+- **SensorBase**: Each sensor instance manages its own periodic task
+- **Per-Sensor Tasks**: Created during SensorManager::init() for sensors with custom intervals
+- **Task Priority**: tskIDLE_PRIORITY + 1 (same as before, but now per-sensor)
+- **Core Affinity**: All sensor tasks pinned to Core 0
+- **Stack Size**: 4KB per sensor task
+
+**Power Efficiency Benefits:**
+- **Before**: CPU woke up every 1 second regardless of sensor intervals
+- **After**: CPU only wakes when a sensor actually needs to be read
+- **Example**: Sensor with 5-minute interval wakes CPU 12 times/hour instead of 3600 times/hour
+
+**Example Configuration:**
 ```ini
 [AutoTimer]
 Interval = 5        ; Flow every 5 minutes
 
+[SHT3x]
+Interval = 30       ; Dedicated task runs every 30 seconds
+
 [DS18B20]
-Interval = 5        ; Sensor read every 5 seconds
+Interval = -1       ; Follows flow interval (no dedicated task)
 ```
-Result: Sensor now correctly reads every 5 seconds, producing ~60 readings per flow cycle.
+
+**Result:** 
+- SHT3x sensor has its own task that reads every 30 seconds (10 readings per flow cycle)
+- DS18B20 follows the flow and is read once every 5 minutes
+- CPU is not unnecessarily woken every second to check sensors
 
 ## Future Enhancements
 
