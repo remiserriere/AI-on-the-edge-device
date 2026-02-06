@@ -348,8 +348,9 @@ bool SensorDS18B20::init()
     
     _initialized = true;
     
-    // Perform ROM search to find all devices on the bus
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Performing ROM search...");
+    // Perform ROM search to find all devices on the bus (ONE-TIME at startup)
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "=== DS18B20 ROM Search (startup only) ===");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Scanning 1-Wire bus for DS18B20 devices...");
     int deviceCount = performRomSearch(_romIds);
     
     if (deviceCount == 0) {
@@ -357,32 +358,38 @@ bool SensorDS18B20::init()
         return false;
     }
     
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Found " + std::to_string(deviceCount) + " DS18B20 sensor(s)");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "ROM search complete: Found " + std::to_string(deviceCount) + " DS18B20 sensor(s)");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Discovered ROM IDs (will be used for all future reads):");
     
     // Log ROM IDs
     for (size_t i = 0; i < _romIds.size(); i++) {
         std::string romIdStr = getRomId(i);
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "  Sensor " + std::to_string(i) + ": " + romIdStr);
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "  Sensor #" + std::to_string(i + 1) + ": " + romIdStr);
     }
     
     // Read initial temperatures from all sensors
     _temperatures.clear();
     _temperatures.resize(_romIds.size(), 0.0f);
     
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Reading initial temperatures from discovered sensors...");
     for (size_t i = 0; i < _romIds.size(); i++) {
         float temp;
         if (readSensorByRom(_romIds[i], temp)) {
             _temperatures[i] = temp;
-            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "  Initial temp [" + std::to_string(i) + "]: " + 
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "  Sensor #" + std::to_string(i + 1) + " initial temp: " + 
                                 std::to_string(temp) + "°C");
         } else {
-            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "  Failed to read initial temperature from sensor " + 
-                                std::to_string(i));
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "  Failed to read initial temperature from sensor #" + 
+                                std::to_string(i + 1));
         }
     }
     
     // Set timestamp for initial read
     _lastRead = time(nullptr);
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "=== DS18B20 initialization complete ===");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Future reads will use these " + std::to_string(deviceCount) + 
+                        " cached sensor(s) without re-scanning");
     
     return true;
 }
@@ -443,6 +450,8 @@ bool SensorDS18B20::readData()
         return false;
     }
     
+    // Read temperatures from all previously discovered sensors
+    // Note: This does NOT perform ROM search - sensors were discovered once at startup
     bool anySuccess = false;
     
     // Read all sensors
@@ -451,10 +460,10 @@ bool SensorDS18B20::readData()
         if (readSensorByRom(_romIds[i], temp)) {
             _temperatures[i] = temp;
             anySuccess = true;
-            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensor " + std::to_string(i) + 
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensor #" + std::to_string(i + 1) + 
                                 " (" + getRomId(i) + "): " + std::to_string(temp) + "°C");
         } else {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor " + std::to_string(i) + 
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor #" + std::to_string(i + 1) + 
                                 " (" + getRomId(i) + ")");
         }
     }

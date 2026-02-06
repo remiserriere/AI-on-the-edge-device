@@ -8,6 +8,13 @@
 
 /**
  * @brief DS18B20 Temperature Sensor (1-Wire)
+ * 
+ * Multi-sensor support with ROM search:
+ * - ROM search is performed ONCE during init() at startup
+ * - All discovered sensor ROM IDs are cached
+ * - Each readData() call reads from the cached list of sensors
+ * - Hot-plugging sensors after startup is NOT supported
+ * - To detect new sensors, device must be restarted
  */
 class SensorDS18B20 : public SensorBase {
 public:
@@ -85,6 +92,8 @@ private:
      * @brief Perform 1-Wire ROM search to find all devices on the bus
      * @param romIds Vector to store found ROM IDs
      * @return Number of devices found
+     * @note This is called ONCE during initialization, not on every read
+     * @note The discovered ROM IDs are cached and reused for all subsequent reads
      */
     int performRomSearch(std::vector<std::array<uint8_t, 8>>& romIds);
     
