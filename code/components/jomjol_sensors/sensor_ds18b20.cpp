@@ -427,19 +427,9 @@ bool SensorDS18B20::init()
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "  Sensor #" + std::to_string(i + 1) + ": " + romIdStr);
     }
     
-    // Read initial temperatures from all sensors and initialize state
+    // Read initial temperatures from all sensors
     _temperatures.clear();
     _temperatures.resize(_romIds.size(), 0.0f);
-    _sensorStates.clear();
-    _sensorStates.resize(_romIds.size());
-    
-    // Initialize sensor states
-    for (size_t i = 0; i < _romIds.size(); i++) {
-        _sensorStates[i].romId = _romIds[i];
-        _sensorStates[i].state = ReadState::IDLE;
-    }
-    
-    _currentSensorIndex = 0;
     
     // Set timestamp for initial read
     _lastRead = time(nullptr);
@@ -526,6 +516,11 @@ void SensorDS18B20::readTask()
     
     if (anySuccess) {
         _lastRead = time(nullptr);
+        
+        // Publish data immediately after successful read
+        publishMQTT();
+        publishInfluxDB();
+        
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task completed successfully");
     } else {
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Background read task failed to read any sensors");

@@ -47,7 +47,191 @@ SensorSHT3x::~SensorSHT3x()
     }
 }
 
-bool SensorSHT3x::init()
+uint8_t SensorSHT3x::calculateCRC(const uint8_t* data, size_t len)
+{
+    // CRC-8 polynomial: 0x31 (x^8 + x^5 + x^4 + 1)
+    uint8_t crc = 0xFF;
+    
+    for (size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (uint8_t bit = 0; bit < 8; bit++) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ 0x31;
+            } else {
+                crc = crc << 1;
+            }
+        }
+    }
+    
+    return crc;
+}
+
+void SensorSHT3x::readTaskWrapper(void* pvParameters)
+{
+    SensorSHT3x* sensor = static_cast<SensorSHT3x*>(pvParameters);
+    sensor->readTask();
+}
+
+void SensorSHT3x::readTask()
+{
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task started");
+    
+    // Read with retry logic
+    const int maxRetries = 3;
+    bool success = false;
+    
+    for (int retry = 0; retry < maxRetries; retry++) {
+        // Send measurement command
+        uint8_t cmd[2];
+        cmd[0] = (SHT3X_CMD_MEASURE_HIGH_REP >> 8) & 0xFF;
+        cmd[1] = SHT3X_CMD_MEASURE_HIGH_REP & 0xFF;
+        
+        i2c_cmd_handle_t cmdHandle = i2c_cmd_link_create();
+        i2c_master_start(cmdHandle);
+        i2c_master_write_byte(cmdHandle, (_i2cAddress << 1) | I2C_MASTER_WRITE, true);
+        i2c_master_write(cmdHandle, cmd, 2, true);
+        i2c_master_stop(cmdHandle);
+        
+        esp_err_t ret = i2c_master_cmd_begin(_i2cPort, cmdHandle, pdMS_TO_TICKS(1000));
+        i2c_cmd_link_delete(cmdHandle);
+        
+        if (ret != ESP_OK) {
+            if (retry < maxRetries - 1) {
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to send measurement command, retry " + 
+                                    std::to_string(retry + 1));
+                vTaskDelay(pdMS_TO_TICKS(50));
+                continue;
+            }
+            break;
+        }
+        
+        // Poll for completion - yields to other tasks
+        // Timeout protection: max 100ms
+        bool measurementComplete = false;
+        const int maxWaitMs = 100;
+        const int pollIntervalMs = 5;
+        int64_t startTime = esp_timer_get_time();
+        
+        for (int elapsed = 0; elapsed < maxWaitMs; elapsed += pollIntervalMs) {
+            vTaskDelay(pdMS_TO_TICKS(pollIntervalMs));
+            
+            // Try to read data - sensor will NACK if not ready
+            uint8_t data[6];
+            cmdHandle = i2c_cmd_link_create();
+            i2c_master_start(cmdHandle);
+            i2c_master_write_byte(cmdHandle, (_i2cAddress << 1) | I2C_MASTER_READ, true);
+            i2c_master_read(cmdHandle, data, 5, I2C_MASTER_ACK);
+            i2c_master_read_byte(cmdHandle, &data[5], I2C_MASTER_NACK);
+            i2c_master_stop(cmdHandle);
+            
+            ret = i2c_master_cmd_begin(_i2cPort, cmdHandle, pdMS_TO_TICKS(100));
+            i2c_cmd_link_delete(cmdHandle);
+            
+            if (ret == ESP_OK) {
+                // Data received
+                int64_t actualTime = (esp_timer_get_time() - startTime) / 1000;
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Measurement completed in " + std::to_string(actualTime) + "ms");
+                
+                // Verify CRC
+                if (calculateCRC(&data[0], 2) != data[2]) {
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Temperature CRC mismatch");
+                    break;  // Try retry
+                }
+                
+                if (calculateCRC(&data[3], 2) != data[5]) {
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Humidity CRC mismatch");
+                    break;  // Try retry
+                }
+                
+                // Convert raw values to temperature and humidity
+                uint16_t rawTemp = (data[0] << 8) | data[1];
+                uint16_t rawHum = (data[3] << 8) | data[4];
+                
+                _temperature = -45.0f + 175.0f * (float)rawTemp / 65535.0f;
+                _humidity = 100.0f * (float)rawHum / 65535.0f;
+                
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read: Temp=" + std::to_string(_temperature) + 
+                                    "°C, Humidity=" + std::to_string(_humidity) + "%");
+                
+                measurementComplete = true;
+                success = true;
+                break;
+            } else if (ret != ESP_ERR_TIMEOUT && ret != ESP_FAIL) {
+                // Real I2C error (not just sensor busy)
+                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "I2C read error: " + std::to_string(ret));
+                break;
+            }
+            // Otherwise sensor is still busy, continue polling
+        }
+        
+        if (success) {
+            break;  // Success, exit retry loop
+        }
+        
+        if (!measurementComplete && retry < maxRetries - 1) {
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Measurement timeout, retry " + std::to_string(retry + 1));
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+    }
+    
+    _readSuccess = success;
+    
+    if (success) {
+        _lastRead = time(nullptr);
+        
+        // Publish data immediately after successful read
+        publishMQTT();
+        publishInfluxDB();
+        
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task completed successfully");
+    } else {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Background read task failed after " + 
+                            std::to_string(maxRetries) + " attempts");
+    }
+    
+    // Task deletes itself
+    _readTaskHandle = nullptr;
+    vTaskDelete(NULL);
+}
+
+bool SensorSHT3x::readData()
+{
+    if (!_initialized) {
+        return false;
+    }
+    
+    // Check if a read is already in progress
+    if (_readTaskHandle != nullptr) {
+        // Read still in progress, return false (not complete yet)
+        return false;
+    }
+    
+    // Note: shouldRead() check is done by SensorManager::update() before calling this
+    // Start a background task to read sensor asynchronously
+    // This task will poll sensor and delete itself when done
+    
+    BaseType_t xReturned = xTaskCreatePinnedToCore(
+        &SensorSHT3x::readTaskWrapper,
+        "sht3x_read",
+        4096,  // Stack size
+        this,  // Parameter
+        tskIDLE_PRIORITY + 1,  // Priority
+        &_readTaskHandle,
+        0  // Core 0
+    );
+    
+    if (xReturned != pdPASS) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to create background read task");
+        _readTaskHandle = nullptr;
+        return false;
+    }
+    
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Started background read task (true async)");
+    
+    // Return true to indicate read was initiated
+    // The task will complete in background
+    return true;
+}
 {
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initializing SHT3x sensor at address 0x" + 
                         std::to_string(_i2cAddress));
@@ -76,182 +260,6 @@ bool SensorSHT3x::init()
     _initialized = true;
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "SHT3x sensor initialized successfully");
     return true;
-}
-
-uint8_t SensorSHT3x::calculateCRC(const uint8_t* data, size_t len)
-{
-    // CRC-8 polynomial: 0x31 (x^8 + x^5 + x^4 + 1)
-    uint8_t crc = 0xFF;
-    
-    for (size_t i = 0; i < len; i++) {
-        crc ^= data[i];
-        for (uint8_t bit = 0; bit < 8; bit++) {
-            if (crc & 0x80) {
-                crc = (crc << 1) ^ 0x31;
-            } else {
-                crc = crc << 1;
-            }
-        }
-    }
-    
-    return crc;
-}
-
-bool SensorSHT3x::startMeasurement()
-{
-    // Send measurement command (high repeatability)
-    uint8_t cmd[2];
-    cmd[0] = (SHT3X_CMD_MEASURE_HIGH_REP >> 8) & 0xFF;
-    cmd[1] = SHT3X_CMD_MEASURE_HIGH_REP & 0xFF;
-    
-    i2c_cmd_handle_t cmdHandle = i2c_cmd_link_create();
-    i2c_master_start(cmdHandle);
-    i2c_master_write_byte(cmdHandle, (_i2cAddress << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write(cmdHandle, cmd, 2, true);
-    i2c_master_stop(cmdHandle);
-    
-    esp_err_t ret = i2c_master_cmd_begin(_i2cPort, cmdHandle, pdMS_TO_TICKS(1000));
-    i2c_cmd_link_delete(cmdHandle);
-    
-    if (ret != ESP_OK) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to send measurement command: " + std::to_string(ret));
-        return false;
-    }
-    
-    // Record start time
-    _measurementStartTime = esp_timer_get_time();
-    _state = ReadState::MEASURING;
-    
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Started measurement");
-    
-    return true;
-}
-
-bool SensorSHT3x::tryReadMeasurement()
-{
-    // Check timeout first (100ms max)
-    int64_t elapsed = (esp_timer_get_time() - _measurementStartTime) / 1000;
-    if (elapsed > 100) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Measurement timeout after " + std::to_string(elapsed) + "ms");
-        _state = ReadState::ERROR;
-        return false;
-    }
-    
-    // Try to read data - sensor will NACK if not ready
-    uint8_t data[6];
-    i2c_cmd_handle_t cmdHandle = i2c_cmd_link_create();
-    i2c_master_start(cmdHandle);
-    i2c_master_write_byte(cmdHandle, (_i2cAddress << 1) | I2C_MASTER_READ, true);
-    i2c_master_read(cmdHandle, data, 5, I2C_MASTER_ACK);
-    i2c_master_read_byte(cmdHandle, &data[5], I2C_MASTER_NACK);
-    i2c_master_stop(cmdHandle);
-    
-    esp_err_t ret = i2c_master_cmd_begin(_i2cPort, cmdHandle, pdMS_TO_TICKS(100));
-    i2c_cmd_link_delete(cmdHandle);
-    
-    if (ret != ESP_OK) {
-        // If error is not a timeout/NACK, it's a real error
-        if (ret != ESP_ERR_TIMEOUT && ret != ESP_FAIL) {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "I2C read error: " + std::to_string(ret));
-            _state = ReadState::ERROR;
-            return false;
-        }
-        // Still measuring, return false to be called again
-        return false;
-    }
-    
-    // Data received, log actual time
-    int64_t actualTime = (esp_timer_get_time() - _measurementStartTime) / 1000;
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Measurement completed in " + std::to_string(actualTime) + "ms");
-    
-    // Verify CRC
-    if (calculateCRC(&data[0], 2) != data[2]) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Temperature CRC mismatch");
-        _state = ReadState::ERROR;
-        return false;
-    }
-    
-    if (calculateCRC(&data[3], 2) != data[5]) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Humidity CRC mismatch");
-        _state = ReadState::ERROR;
-        return false;
-    }
-    
-    // Convert raw values to temperature and humidity
-    uint16_t rawTemp = (data[0] << 8) | data[1];
-    uint16_t rawHum = (data[3] << 8) | data[4];
-    
-    _temperature = -45.0f + 175.0f * (float)rawTemp / 65535.0f;
-    _humidity = 100.0f * (float)rawHum / 65535.0f;
-    
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read: Temp=" + std::to_string(_temperature) + 
-                        "°C, Humidity=" + std::to_string(_humidity) + "%");
-    
-    _state = ReadState::COMPLETE;
-    return true;
-}
-
-bool SensorSHT3x::readData()
-{
-    if (!_initialized) {
-        return false;
-    }
-    
-    // Note: shouldRead() check is done by SensorManager::update() before calling this
-    // We don't check it again here to avoid breaking "follow flow" mode
-    
-    // Async state machine - processes one step per call, doesn't block
-    const int maxRetries = 3;
-    
-    switch (_state) {
-        case ReadState::IDLE:
-            // Start measurement
-            if (startMeasurement()) {
-                _state = ReadState::MEASURING;
-            } else {
-                _state = ReadState::ERROR;
-            }
-            // Return true to be called again
-            return true;
-            
-        case ReadState::MEASURING:
-            // Try to read measurement (non-blocking)
-            if (tryReadMeasurement()) {
-                // Read successful
-                _state = ReadState::COMPLETE;
-            } else if (_state == ReadState::ERROR) {
-                // Timeout or error, handle retry
-                if (_retryCount < maxRetries - 1) {
-                    _retryCount++;
-                    _state = ReadState::IDLE;  // Retry
-                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Read failed, retry " + 
-                                        std::to_string(_retryCount) + "/" + std::to_string(maxRetries - 1));
-                } else {
-                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor after " + 
-                                        std::to_string(maxRetries) + " attempts");
-                    _retryCount = 0;
-                    _state = ReadState::IDLE;
-                    return false;
-                }
-            }
-            // If still measuring, return true to be called again
-            return true;
-            
-        case ReadState::COMPLETE:
-            // Read complete, update timestamp and reset state
-            _lastRead = time(nullptr);
-            _state = ReadState::IDLE;
-            _retryCount = 0;
-            return true;
-            
-        case ReadState::ERROR:
-            // Error occurred, reset state
-            _state = ReadState::IDLE;
-            _retryCount = 0;
-            return false;
-    }
-    
-    return false;
 }
 
 void SensorSHT3x::publishMQTT()
