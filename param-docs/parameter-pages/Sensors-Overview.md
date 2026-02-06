@@ -1,5 +1,7 @@
 # External Sensors Overview
 
+> **🚀 Quick Start**: To enable sensors, you must first configure GPIO pins in the **Advanced Settings** section. See [Configuration](#configuration) below for step-by-step instructions.
+
 ## Device Health & Safety Monitoring
 
 External sensors can be connected to monitor the environmental conditions around your AI-on-the-edge-device. This is **especially critical for outdoor installations** where temperature and humidity can indicate imminent device failure.
@@ -63,10 +65,39 @@ External sensors can be connected to monitor the environmental conditions around
 
 ## Configuration
 
-Sensors are configured in two parts:
+Sensors are configured in **three parts** (in this order):
 
-1. **GPIO Assignment**: Set GPIO pins to sensor modes in `[GPIO]` section
-2. **Sensor Parameters**: Configure sensor-specific settings in `[SHT3x]` or `[DS18B20]` sections
+### 1. GPIO Pin Assignment (REQUIRED FIRST STEP)
+
+> **⚠️ Important**: GPIO configuration settings are **hidden by default** in the web interface under "Advanced Settings" or "Expert Options" to prevent accidental misconfiguration.
+
+**To access GPIO settings:**
+1. Navigate to the **Configuration** page
+2. Scroll to the **GPIO** section
+3. Click **"Show Expert Options"** or **"Advanced Settings"**
+4. Configure the required GPIO pins:
+   - **For DS18B20**: Set one GPIO pin (e.g., IO12) to `onewire` mode
+   - **For SHT3x**: Set two GPIO pins (e.g., IO12 to `i2c-sda`, IO13 to `i2c-scl`)
+5. Save and restart if required
+
+**Detailed GPIO Configuration Guides:**
+- [GPIO 1-Wire Configuration](GPIO/OneWire.md) - For DS18B20 sensors
+- [GPIO I²C SDA Configuration](GPIO/I2C-SDA.md) - For SHT3x data line
+- [GPIO I²C SCL Configuration](GPIO/I2C-SCL.md) - For SHT3x clock line
+
+### 2. Physical Wiring
+
+After configuring GPIO pins, connect your sensors with proper pull-up resistors:
+- **DS18B20**: 4.7kΩ pull-up on DATA line
+- **SHT3x**: 4.7kΩ pull-ups on both SDA and SCL lines
+- **Power**: Always use 3.3V (NOT 5V for SHT3x!)
+
+### 3. Sensor Parameter Configuration
+
+Finally, configure sensor-specific settings in `[SHT3x]` or `[DS18B20]` sections:
+- Enable the sensor
+- Set reading interval
+- Configure MQTT/InfluxDB publishing
 
 See individual parameter documentation for details.
 
