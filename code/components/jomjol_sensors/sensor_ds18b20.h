@@ -61,17 +61,40 @@ private:
     bool _initialized;
     
     /**
-     * @brief Scan the 1-Wire bus for DS18B20 devices
+     * @brief Scan the 1-Wire bus for DS18B20 devices using ROM search
      * @return Number of devices found
      */
     int scanDevices();
     
     /**
-     * @brief Read temperature from a single DS18B20 sensor
+     * @brief Read temperature from a specific DS18B20 sensor by ROM ID
+     * @param romId ROM ID of the sensor to read
+     * @param temp Output temperature value
+     * @return true if successful
+     */
+    bool readSensorByRom(const std::array<uint8_t, 8>& romId, float& temp);
+    
+    /**
+     * @brief Read temperature from a single DS18B20 sensor (single device mode)
      * @param temp Output temperature value
      * @return true if successful
      */
     bool readOneSensor(float& temp);
+    
+    /**
+     * @brief Perform 1-Wire ROM search to find all devices on the bus
+     * @param romIds Vector to store found ROM IDs
+     * @return Number of devices found
+     */
+    int performRomSearch(std::vector<std::array<uint8_t, 8>>& romIds);
+    
+    /**
+     * @brief Calculate CRC8 for ROM or scratchpad data
+     * @param data Data buffer
+     * @param len Length of data
+     * @return CRC8 value
+     */
+    uint8_t calculateCRC8(const uint8_t* data, int len);
 };
 
 #endif // SENSOR_DS18B20_H
