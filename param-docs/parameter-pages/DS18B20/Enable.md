@@ -14,12 +14,53 @@ The DS18B20 is a digital temperature sensor using 1-Wire protocol. Key features:
 - **Chainable**: Multiple sensors on same wire, each with unique 64-bit ROM ID
 - **Conversion Time**: 750ms for 12-bit resolution
 
-## Prerequisites
+## ⚠️ Prerequisites - GPIO Configuration Required!
 
-Before enabling:
-1. **GPIO Configuration**: Set one GPIO to `onewire` mode in the GPIO section
-2. **Wiring**: Connect DS18B20 with 4.7kΩ pull-up resistor on DATA line
-3. **Power**: Can use parasitic power or external 3.3V
+**Before enabling the DS18B20 sensor, you MUST configure a GPIO pin for 1-Wire mode.**
+
+### Step 1: Access Advanced GPIO Settings
+
+The GPIO configuration section is **hidden by default** in the web interface. To access it:
+
+1. Navigate to the **Configuration** page in the web UI
+2. Scroll to the **GPIO** section
+3. Click **"Show Expert Options"** or **"Advanced Settings"** button (if available)
+4. The GPIO pin configuration options will appear
+
+### Step 2: Configure GPIO Pin for 1-Wire
+
+Once the GPIO section is visible:
+
+1. Select a GPIO pin from the available options (recommended: **IO12** or **IO13**)
+2. Set the GPIO mode to **`onewire`** from the dropdown
+3. Save the configuration
+4. Restart the device if required
+
+**Recommended GPIO Pins:**
+- **IO12** ✅ - Fully available (SD card D2 unused in 1-bit SD mode)
+- **IO13** ✅ - Available with built-in pull-up resistor
+
+See the [GPIO 1-Wire Configuration Guide](../GPIO/OneWire.md) for detailed pin selection and wiring information.
+
+### Step 3: Physical Wiring
+
+After configuring the GPIO:
+
+1. **Connect DS18B20 sensor** with proper wiring:
+   - VDD → 3.3V
+   - GND → GND  
+   - DATA → Selected GPIO pin (e.g., IO12)
+2. **Add 4.7kΩ pull-up resistor** between DATA and 3.3V
+3. **Power**: Can use parasitic power or external 3.3V supply
+
+### Step 4: Enable the Sensor
+
+After GPIO configuration and wiring are complete:
+
+1. Return to the **DS18B20** configuration section
+2. Set **Enable = true**
+3. Configure other settings (Interval, MQTT, InfluxDB)
+4. Save and restart if required
 
 ## Multi-Sensor Chaining
 

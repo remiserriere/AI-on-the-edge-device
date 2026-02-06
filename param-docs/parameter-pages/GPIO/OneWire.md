@@ -2,8 +2,19 @@
 
 Configure a GPIO pin for 1-Wire protocol used by DS18B20 temperature sensors.
 
+> **📍 Configuration Context**: This GPIO setting is part of the **advanced/expert settings** in the web UI. You need to configure this **before** enabling DS18B20 sensors. See [DS18B20 Enable](../DS18B20/Enable.md) for complete setup instructions.
+
 ## Value
 Select `onewire` from the GPIO mode dropdown.
+
+## When to Use This Setting
+
+Configure a GPIO pin as `onewire` when you want to:
+- Connect DS18B20 temperature sensor(s) to monitor device temperature
+- Enable environmental monitoring for outdoor installations
+- Set up multi-sensor temperature chains for thermal analysis
+
+**Next Step**: After configuring this GPIO pin, go to the [DS18B20] configuration section and set `Enable = true`.
 
 ## Compatible GPIO Pins
 
