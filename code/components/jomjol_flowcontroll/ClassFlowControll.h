@@ -73,6 +73,7 @@ public:
 
 	bool getIsAutoStart();
 	void setAutoStartInterval(long &_interval);
+	float getAutoInterval() { return AutoInterval; }  // Get flow interval in minutes
 
 	std::string* getActStatusWithTime();
 	std::string* getActStatus();
