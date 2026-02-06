@@ -12,12 +12,65 @@ The SHT3x is a high-precision temperature and humidity sensor connected via I²C
 - **Temperature**: -40°C to +125°C (±0.2°C accuracy)
 - **Relative Humidity**: 0-100% RH (±2% accuracy)
 
-## Prerequisites
+## ⚠️ Prerequisites - GPIO Configuration Required!
 
-Before enabling:
-1. **GPIO Configuration**: Set one GPIO to `i2c-sda` and another to `i2c-scl` in the GPIO section
-2. **Wiring**: Connect SHT3x sensor with 4.7kΩ pull-up resistors on SDA/SCL lines
-3. **Power**: Ensure sensor is powered from 3.3V (NOT 5V)
+**Before enabling the SHT3x sensor, you MUST configure TWO GPIO pins for I²C communication (SDA and SCL).**
+
+### Step 1: Access Advanced GPIO Settings
+
+The GPIO configuration section is **hidden by default** in the web interface. To access it:
+
+1. Navigate to the **Configuration** page in the web UI
+2. Scroll to the **GPIO** section
+3. Click **"Show Expert Options"** or **"Advanced Settings"** button (if available)
+4. The GPIO pin configuration options will appear
+
+> **💡 Tip**: GPIO settings are in an "advanced" or "expert" section to prevent accidental misconfiguration that could affect device operation.
+
+### Step 2: Configure GPIO Pins for I²C
+
+Once the GPIO section is visible, configure **two pins** for I²C:
+
+#### I²C SDA (Data Line)
+1. Select a GPIO pin (recommended: **IO12**)
+2. Set the mode to **`i2c-sda`** from the dropdown
+3. This pin carries bidirectional data
+
+#### I²C SCL (Clock Line)
+1. Select a different GPIO pin (recommended: **IO13**)
+2. Set the mode to **`i2c-scl`** from the dropdown
+3. This pin provides the clock signal
+
+**Recommended Configuration:**
+- **SDA**: IO12 ✅ (Fully available, good for data)
+- **SCL**: IO13 ✅ (Has built-in pull-up, ideal for clock)
+
+See the detailed guides:
+- [GPIO I²C SDA Configuration](../GPIO/I2C-SDA.md)
+- [GPIO I²C SCL Configuration](../GPIO/I2C-SCL.md)
+
+### Step 3: Physical Wiring
+
+After configuring both GPIO pins:
+
+1. **Connect SHT3x sensor** with proper wiring:
+   - VDD → 3.3V (**NOT 5V!**)
+   - GND → GND
+   - SDA → Selected SDA GPIO (e.g., IO12)
+   - SCL → Selected SCL GPIO (e.g., IO13)
+2. **Add 4.7kΩ pull-up resistors**:
+   - One between SDA and 3.3V
+   - One between SCL and 3.3V
+3. **Verify power**: Ensure sensor receives 3.3V (5V will damage it!)
+
+### Step 4: Enable the Sensor
+
+After GPIO configuration and wiring are complete:
+
+1. Return to the **SHT3x** configuration section
+2. Set **Enable = true**
+3. Configure other settings (Address, Interval, MQTT, InfluxDB)
+4. Save and restart if required
 
 ## Device Health Monitoring Use Case
 

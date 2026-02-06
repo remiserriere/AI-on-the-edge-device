@@ -2,8 +2,21 @@
 
 Configure a GPIO pin as I²C SDA (data line) for SHT3x temperature & humidity sensor.
 
+> **📍 Configuration Context**: This GPIO setting is part of the **advanced/expert settings** in the web UI. You need to configure **both SDA and SCL** pins **before** enabling the SHT3x sensor. See [SHT3x Enable](../SHT3x/Enable.md) for complete setup instructions.
+
 ## Value
 Select `i2c-sda` from the GPIO mode dropdown.
+
+## When to Use This Setting
+
+Configure a GPIO pin as `i2c-sda` when you want to:
+- Connect an SHT3x sensor to monitor temperature and humidity
+- Enable environmental monitoring for outdoor installations
+- Track enclosure conditions to prevent device failures
+
+**Important**: You must also configure a second GPIO pin as `i2c-scl` (clock line). See [GPIO I²C SCL](I2C-SCL.md).
+
+**Next Step**: After configuring both SDA and SCL GPIO pins, go to the [SHT3x] configuration section and set `Enable = true`.
 
 ## Compatible GPIO Pins
 
