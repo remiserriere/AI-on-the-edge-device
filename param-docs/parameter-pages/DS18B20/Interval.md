@@ -39,6 +39,8 @@ Result: Sensor read every 10 minutes, aligned with meter readings.
 
 Set a specific interval in seconds, independent of the main flow cycle.
 
+**Note:** As of version [current], custom intervals are now properly supported through a background task. Sensors with custom intervals will be read at their specified rate, even if shorter than the flow interval.
+
 **Use Cases:**
 - **High-frequency monitoring**: Interval = 60 (every minute) for rapid temperature changes
 - **Low-frequency logging**: Interval = 3600 (every hour) to reduce data volume
@@ -184,6 +186,37 @@ GROUP BY time(1h)
 ```
 
 Reveals: Temperature gradients, insulation effectiveness, heat loss patterns
+
+## How Custom Intervals Work (Technical Details)
+
+When you set a custom interval (e.g., `Interval = 5`), the system uses a background task to read sensors independently of the main flow cycle.
+
+**Background Task Behavior:**
+- Runs every 1 second checking if sensors need reading
+- Minimal CPU overhead - only checks timestamps
+- Low priority to not interfere with main flow
+- Automatically starts when sensors are initialized
+
+**Example Scenario:**
+```ini
+[AutoTimer]
+Interval = 5        ; Flow every 5 minutes (300 seconds)
+
+[DS18B20]
+Interval = 5        ; Read sensor every 5 seconds
+```
+
+**What happens:**
+1. Main flow runs every 300 seconds
+2. Background task wakes up every 1 second
+3. Checks if 5 seconds elapsed since last sensor read
+4. If yes, reads sensor and publishes to MQTT/InfluxDB
+5. Result: ~60 sensor readings per flow cycle
+
+**Performance Impact:**
+- CPU: Minimal (task mostly sleeps)
+- Memory: 4KB for background task stack
+- Sensor read time: ~800ms per DS18B20 (unchanged)
 
 ## Minimum Interval
 

@@ -297,7 +297,7 @@ Documentation:
 
 1. **1-Wire Blocking**: DS18B20 reading blocks for ~800ms (conversion + read time)
    - Impact: Minimal on typical 5-10 minute flow cycles
-   - Future: Could implement async reading
+   - Note: Custom intervals now properly supported via background task (fixed in latest version)
 
 2. **GPIO Pins**: Limited to IO1, IO3, IO12, IO13
    - Impact: Other GPIOs may conflict with camera/SD
@@ -307,6 +307,28 @@ Documentation:
    - Impact: Manual sensor configuration required
    - Workaround: Example YAML provided in docs
    - Future: Add MQTT discovery messages
+
+## Recent Improvements
+
+### Custom Interval Support (Latest Version)
+
+**Problem Solved:** Previously, sensors with custom intervals shorter than the flow interval were not read at their specified rate.
+
+**Solution:** Implemented a background FreeRTOS task that:
+- Runs every 1 second independently of main flow
+- Checks and reads sensors based on their individual intervals
+- Allows high-frequency monitoring (e.g., every 5 seconds) even with long flow intervals (e.g., 5 minutes)
+- Minimal performance impact (4KB memory, low CPU usage)
+
+**Example:**
+```ini
+[AutoTimer]
+Interval = 5        ; Flow every 5 minutes
+
+[DS18B20]
+Interval = 5        ; Sensor read every 5 seconds
+```
+Result: Sensor now correctly reads every 5 seconds, producing ~60 readings per flow cycle.
 
 ## Future Enhancements
 
