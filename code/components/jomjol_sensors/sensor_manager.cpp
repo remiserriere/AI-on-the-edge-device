@@ -202,11 +202,22 @@ void SensorManager::update(int flowInterval)
     }
     
     for (auto& sensor : _sensors) {
+        // For sensors with custom intervals, their periodic tasks handle reading
+        // Only process "follow flow" sensors here (interval = -1)
+        if (sensor->getReadInterval() > 0) {
+            continue;
+        }
+        
+        // Check if we should start a new read
         if (sensor->shouldRead(flowInterval)) {
-            if (sensor->readData()) {
-                sensor->publishMQTT();
-                sensor->publishInfluxDB();
-            }
+            // Start async read (spawns ephemeral background task)
+            // readData() returns immediately - conversion happens in background
+            // The background task will:
+            // 1. Poll hardware with vTaskDelay() yields (power efficient)
+            // 2. Update sensor data when complete
+            // 3. Publish to MQTT/InfluxDB
+            // 4. Self-terminate via vTaskDelete(NULL)
+            sensor->readData();
         }
     }
 }

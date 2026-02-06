@@ -73,6 +73,12 @@ public:
      * @return interval in seconds (-1 = follow flow, >0 = custom interval)
      */
     int getReadInterval() const { return _readInterval; }
+    
+    /**
+     * @brief Check if sensor is currently performing an async read operation
+     * @return true if read is in progress
+     */
+    virtual bool isReadInProgress() const { return false; }
 
 protected:
     std::string _mqttTopic;

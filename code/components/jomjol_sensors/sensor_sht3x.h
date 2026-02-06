@@ -46,20 +46,26 @@ public:
      */
     float getHumidity() const { return _humidity; }
     
+    /**
+     * @brief Check if a read operation is currently in progress
+     * @return true if reading
+     */
+    bool isReadInProgress() const { return _readTaskHandle != nullptr; }
+    
 private:
     float _temperature;
     float _humidity;
     uint8_t _i2cAddress;
     i2c_port_t _i2cPort;
     bool _initialized;
+    TaskHandle_t _readTaskHandle;  // Handle for background read task
+    bool _readSuccess;  // Result of background read
     
     /**
-     * @brief Send measurement command and read result
-     * @param temp Output temperature value
-     * @param hum Output humidity value
-     * @return true if successful
+     * @brief Background task that polls sensor until measurement complete
      */
-    bool measureAndRead(float& temp, float& hum);
+    static void readTaskWrapper(void* pvParameters);
+    void readTask();
     
     /**
      * @brief Calculate CRC8 checksum for SHT3x

@@ -61,11 +61,25 @@ public:
      */
     std::string getRomId(int index = 0) const;
     
+    /**
+     * @brief Check if a read operation is currently in progress
+     * @return true if reading
+     */
+    bool isReadInProgress() const { return _readTaskHandle != nullptr; }
+    
 private:
     std::vector<float> _temperatures;
     std::vector<std::array<uint8_t, 8>> _romIds; // Store ROM IDs for each sensor
     gpio_num_t _gpio;
     bool _initialized;
+    TaskHandle_t _readTaskHandle;  // Handle for background read task
+    bool _readSuccess;  // Result of background read
+    
+    /**
+     * @brief Background task that polls sensors until conversion complete
+     */
+    static void readTaskWrapper(void* pvParameters);
+    void readTask();
     
     /**
      * @brief Scan the 1-Wire bus for DS18B20 devices using ROM search
@@ -74,19 +88,25 @@ private:
     int scanDevices();
     
     /**
-     * @brief Read temperature from a specific DS18B20 sensor by ROM ID
-     * @param romId ROM ID of the sensor to read
-     * @param temp Output temperature value
-     * @return true if successful
+     * @brief Start temperature conversion for a sensor (non-blocking)
+     * @param sensorIndex Index of sensor to start conversion for
+     * @return true if conversion started successfully
      */
-    bool readSensorByRom(const std::array<uint8_t, 8>& romId, float& temp);
+    bool startConversion(size_t sensorIndex);
     
     /**
-     * @brief Read temperature from a single DS18B20 sensor (single device mode)
-     * @param temp Output temperature value
-     * @return true if successful
+     * @brief Check if conversion is complete (non-blocking check only)
+     * @param sensorIndex Index of sensor to check
+     * @return true if conversion is complete
      */
-    bool readOneSensor(float& temp);
+    bool isConversionComplete(size_t sensorIndex);
+    
+    /**
+     * @brief Read scratchpad from sensor
+     * @param sensorIndex Index of sensor to read from
+     * @return true if read was successful
+     */
+    bool readScratchpad(size_t sensorIndex);
     
     /**
      * @brief Perform 1-Wire ROM search to find all devices on the bus

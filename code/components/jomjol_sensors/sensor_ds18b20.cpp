@@ -35,7 +35,7 @@ SensorDS18B20::SensorDS18B20(gpio_num_t gpio,
                              int interval,
                              bool mqttEnabled,
                              bool influxEnabled)
-    : _gpio(gpio), _initialized(false)
+    : _gpio(gpio), _initialized(false), _readTaskHandle(nullptr), _readSuccess(false)
 {
     _mqttTopic = mqttTopic;
     _influxMeasurement = influxMeasurement;
@@ -47,6 +47,12 @@ SensorDS18B20::SensorDS18B20(gpio_num_t gpio,
 
 SensorDS18B20::~SensorDS18B20()
 {
+    // Stop background task if running
+    if (_readTaskHandle != nullptr) {
+        vTaskDelete(_readTaskHandle);
+        _readTaskHandle = nullptr;
+    }
+    
     if (_initialized) {
         gpio_reset_pin(_gpio);
     }
@@ -276,10 +282,15 @@ int SensorDS18B20::performRomSearch(std::vector<std::array<uint8_t, 8>>& romIds)
     return romIds.size();
 }
 
-bool SensorDS18B20::readSensorByRom(const std::array<uint8_t, 8>& romId, float& temp)
+bool SensorDS18B20::startConversion(size_t sensorIndex)
 {
+    if (sensorIndex >= _romIds.size()) {
+        return false;
+    }
+    
     // Reset and check presence
     if (!ow_reset(_gpio)) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "No presence pulse for sensor #" + std::to_string(sensorIndex + 1));
         return false;
     }
     
@@ -288,27 +299,53 @@ bool SensorDS18B20::readSensorByRom(const std::array<uint8_t, 8>& romId, float& 
     
     // Send the ROM ID
     for (int i = 0; i < 8; i++) {
-        ow_write_byte(_gpio, romId[i]);
+        ow_write_byte(_gpio, _romIds[sensorIndex][i]);
     }
     
     // Start temperature conversion
     ow_write_byte(_gpio, DS18B20_CMD_CONVERT_T);
     
-    // Wait for conversion (750ms for 12-bit resolution)
-    vTaskDelay(pdMS_TO_TICKS(750));
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Started conversion for sensor #" + std::to_string(sensorIndex + 1));
+    
+    return true;
+}
+
+bool SensorDS18B20::isConversionComplete(size_t sensorIndex)
+{
+    if (sensorIndex >= _romIds.size()) {
+        return false;
+    }
+    
+    // Check if conversion is complete by reading the bus
+    // DS18B20 pulls line low during conversion, releases when done
+    return ow_read(_gpio);
+}
+
+bool SensorDS18B20::readScratchpad(size_t sensorIndex)
+{
+    if (sensorIndex >= _romIds.size()) {
+        return false;
+    }
     
     // Reset and check presence
     if (!ow_reset(_gpio)) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "No presence pulse when reading sensor #" + std::to_string(sensorIndex + 1));
         return false;
     }
+    
+    // Small delay after reset for bus stabilization
+    vTaskDelay(pdMS_TO_TICKS(1));
     
     // Match ROM again
     ow_write_byte(_gpio, DS18B20_CMD_MATCH_ROM);
     
     // Send the ROM ID again
     for (int i = 0; i < 8; i++) {
-        ow_write_byte(_gpio, romId[i]);
+        ow_write_byte(_gpio, _romIds[sensorIndex][i]);
     }
+    
+    // Small delay before read command for better reliability
+    vTaskDelay(pdMS_TO_TICKS(1));
     
     // Read scratchpad
     ow_write_byte(_gpio, DS18B20_CMD_READ_SCRATCHPAD);
@@ -321,13 +358,21 @@ bool SensorDS18B20::readSensorByRom(const std::array<uint8_t, 8>& romId, float& 
     
     // Verify CRC
     if (calculateCRC8(data, 8) != data[8]) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "CRC mismatch in DS18B20 data");
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "CRC mismatch for sensor #" + std::to_string(sensorIndex + 1) + 
+                            " (expected: 0x" + std::to_string(calculateCRC8(data, 8)) + 
+                            ", got: 0x" + std::to_string(data[8]) + ")");
         return false;
     }
     
     // Convert temperature
     int16_t rawTemp = (data[1] << 8) | data[0];
-    temp = (float)rawTemp / 16.0f;
+    float temp = (float)rawTemp / 16.0f;
+    
+    // Update temperature directly
+    _temperatures[sensorIndex] = temp;
+    
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensor #" + std::to_string(sensorIndex + 1) + 
+                        " (" + getRomId(sensorIndex) + "): " + std::to_string(temp) + "°C");
     
     return true;
 }
@@ -374,19 +419,6 @@ bool SensorDS18B20::init()
     _temperatures.clear();
     _temperatures.resize(_romIds.size(), 0.0f);
     
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Reading initial temperatures from discovered sensors...");
-    for (size_t i = 0; i < _romIds.size(); i++) {
-        float temp;
-        if (readSensorByRom(_romIds[i], temp)) {
-            _temperatures[i] = temp;
-            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "  Sensor #" + std::to_string(i + 1) + " initial temp: " + 
-                                std::to_string(temp) + "°C");
-        } else {
-            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "  Failed to read initial temperature from sensor #" + 
-                                std::to_string(i + 1));
-        }
-    }
-    
     // Set timestamp for initial read
     _lastRead = time(nullptr);
     
@@ -397,50 +429,108 @@ bool SensorDS18B20::init()
     return true;
 }
 
-bool SensorDS18B20::readOneSensor(float& temp)
+void SensorDS18B20::readTaskWrapper(void* pvParameters)
 {
-    // Reset and check presence
-    if (!ow_reset(_gpio)) {
-        return false;
+    SensorDS18B20* sensor = static_cast<SensorDS18B20*>(pvParameters);
+    sensor->readTask();
+}
+
+void SensorDS18B20::readTask()
+{
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task started");
+    
+    // Read all sensors with retry logic
+    const int maxRetries = 5;  // Increased from 3 to 5 for better transient error handling
+    bool anySuccess = false;
+    
+    for (size_t sensorIndex = 0; sensorIndex < _romIds.size(); sensorIndex++) {
+        bool success = false;
+        
+        for (int retry = 0; retry < maxRetries; retry++) {
+            // Start conversion
+            if (!startConversion(sensorIndex)) {
+                if (retry < maxRetries - 1) {
+                    // Exponential backoff: 50ms, 100ms, 150ms, 200ms, 250ms
+                    int delayMs = 50 + (retry * 50);
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to start conversion for sensor #" + 
+                                        std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1) + 
+                                        " after " + std::to_string(delayMs) + "ms");
+                    vTaskDelay(pdMS_TO_TICKS(delayMs));
+                    continue;
+                }
+                break;
+            }
+            
+            // Poll for completion - yields to other tasks
+            bool conversionComplete = false;
+            const int maxWaitMs = 1000;
+            const int pollIntervalMs = 10;
+            
+            for (int elapsed = 0; elapsed < maxWaitMs; elapsed += pollIntervalMs) {
+                vTaskDelay(pdMS_TO_TICKS(pollIntervalMs));
+                
+                if (isConversionComplete(sensorIndex)) {
+                    conversionComplete = true;
+                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Conversion completed for sensor #" + 
+                                        std::to_string(sensorIndex + 1) + " after ~" + std::to_string(elapsed) + "ms");
+                    break;
+                }
+            }
+            
+            if (!conversionComplete) {
+                if (retry < maxRetries - 1) {
+                    int delayMs = 50 + (retry * 50);
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Conversion timeout for sensor #" + 
+                                        std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1) + 
+                                        " after " + std::to_string(delayMs) + "ms");
+                    vTaskDelay(pdMS_TO_TICKS(delayMs));
+                    continue;
+                }
+                break;
+            }
+            
+            // Add settling delay after conversion completes to reduce CRC errors
+            // This gives the sensor time to stabilize the data before we read it
+            vTaskDelay(pdMS_TO_TICKS(3));
+            
+            // Read the data
+            if (readScratchpad(sensorIndex)) {
+                success = true;
+                anySuccess = true;
+                break;
+            } else if (retry < maxRetries - 1) {
+                // Exponential backoff on read failures
+                int delayMs = 50 + (retry * 50);
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Read failed for sensor #" + 
+                                    std::to_string(sensorIndex + 1) + " (likely CRC error), retry " + 
+                                    std::to_string(retry + 1) + " after " + std::to_string(delayMs) + "ms");
+                vTaskDelay(pdMS_TO_TICKS(delayMs));
+            }
+        }
+        
+        if (!success) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor #" + 
+                                std::to_string(sensorIndex + 1) + " after " + std::to_string(maxRetries) + " attempts");
+        }
     }
     
-    // Skip ROM (single device mode)
-    ow_write_byte(_gpio, DS18B20_CMD_SKIP_ROM);
+    _readSuccess = anySuccess;
     
-    // Start temperature conversion
-    ow_write_byte(_gpio, DS18B20_CMD_CONVERT_T);
-    
-    // Wait for conversion (750ms for 12-bit resolution)
-    vTaskDelay(pdMS_TO_TICKS(750));
-    
-    // Reset and check presence
-    if (!ow_reset(_gpio)) {
-        return false;
+    if (anySuccess) {
+        _lastRead = time(nullptr);
+        
+        // Publish data from background task after successful read
+        publishMQTT();
+        publishInfluxDB();
+        
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task completed successfully");
+    } else {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Background read task failed to read any sensors");
     }
     
-    // Skip ROM again
-    ow_write_byte(_gpio, DS18B20_CMD_SKIP_ROM);
-    
-    // Read scratchpad
-    ow_write_byte(_gpio, DS18B20_CMD_READ_SCRATCHPAD);
-    
-    // Read 9 bytes
-    uint8_t data[9];
-    for (int i = 0; i < 9; i++) {
-        data[i] = ow_read_byte(_gpio);
-    }
-    
-    // Verify CRC
-    if (calculateCRC8(data, 8) != data[8]) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "CRC mismatch in DS18B20 data");
-        return false;
-    }
-    
-    // Convert temperature
-    int16_t rawTemp = (data[1] << 8) | data[0];
-    temp = (float)rawTemp / 16.0f;
-    
-    return true;
+    // Clear handle before deleting task to prevent race condition
+    _readTaskHandle = nullptr;
+    vTaskDelete(NULL);
 }
 
 bool SensorDS18B20::readData()
@@ -449,34 +539,40 @@ bool SensorDS18B20::readData()
         return false;
     }
     
-    // Note: shouldRead() check is done by SensorManager::update() before calling this
-    // We don't check it again here to avoid breaking "follow flow" mode
-    
-    // Read temperatures from all previously discovered sensors
-    // Note: This does NOT perform ROM search - sensors were discovered once at startup
-    bool anySuccess = false;
-    
-    // Read all sensors
-    for (size_t i = 0; i < _romIds.size(); i++) {
-        float temp;
-        if (readSensorByRom(_romIds[i], temp)) {
-            _temperatures[i] = temp;
-            anySuccess = true;
-            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensor #" + std::to_string(i + 1) + 
-                                " (" + getRomId(i) + "): " + std::to_string(temp) + "°C");
-        } else {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor #" + std::to_string(i + 1) + 
-                                " (" + getRomId(i) + ")");
-        }
-    }
-    
-    if (!anySuccess) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read any DS18B20 sensors");
+    // Check if a read is already in progress
+    // Note: This check is safe because:
+    // 1. Task sets _readTaskHandle to nullptr immediately before vTaskDelete(NULL)
+    // 2. vTaskDelete(NULL) for current task is synchronous - task ends immediately
+    // 3. No window where task is active but handle is nullptr
+    if (_readTaskHandle != nullptr) {
+        // Read still in progress, return false (not complete yet)
         return false;
     }
     
-    _lastRead = time(nullptr);
+    // Note: shouldRead() check is done by SensorManager::update() before calling this
+    // Start a background task to read sensors asynchronously
+    // This task will poll sensors and delete itself when done
     
+    BaseType_t xReturned = xTaskCreatePinnedToCore(
+        &SensorDS18B20::readTaskWrapper,
+        "ds18b20_read",
+        4096,  // Stack size
+        this,  // Parameter
+        tskIDLE_PRIORITY + 1,  // Priority
+        &_readTaskHandle,
+        0  // Core 0
+    );
+    
+    if (xReturned != pdPASS) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to create background read task");
+        _readTaskHandle = nullptr;
+        return false;
+    }
+    
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Started background read task (true async)");
+    
+    // Return true to indicate read was initiated
+    // The task will complete in background
     return true;
 }
 
