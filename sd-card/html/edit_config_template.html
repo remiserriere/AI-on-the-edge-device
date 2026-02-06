@@ -3348,7 +3348,7 @@ function ReadParameter(_param, _cat, _name, _optional, _number = -1) {
                 NUMBERS[_number][_cat][_name]["value"+j] = element.selectedIndex > -1 ? element.options[element.selectedIndex].value : "";
             }
             else if ((element.getAttribute("type") != null) && (element.getAttribute("type").toLowerCase() == "checkbox")) {
-                NUMBERS[_number][_cat][_name]["value"+j] = element.checked;
+                NUMBERS[_number][_cat][_name]["value"+j] = element.checked ? "true" : "false";
             }
             else {
                 if ((NUMBERS[_number][_cat][_name].checkRegExList != null) && (NUMBERS[_number][_cat][_name].checkRegExList[j-1] != null)) {
@@ -3377,7 +3377,7 @@ function ReadParameter(_param, _cat, _name, _optional, _number = -1) {
                 _param[_cat][_name]["value"+j] = element.selectedIndex > -1 ? element.options[element.selectedIndex].value : "";
             }
             else if ((element.getAttribute("type") != null) && (element.getAttribute("type").toLowerCase() == "checkbox")) {
-                _param[_cat][_name]["value"+j] = element.checked;
+                _param[_cat][_name]["value"+j] = element.checked ? "true" : "false";
             }
             else {
                 if ((_param[_cat][_name].checkRegExList != null) && (_param[_cat][_name].checkRegExList[j-1] != null)) {
