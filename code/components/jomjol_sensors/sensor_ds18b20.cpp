@@ -333,6 +333,9 @@ bool SensorDS18B20::readScratchpad(size_t sensorIndex)
         return false;
     }
     
+    // Small delay after reset for bus stabilization
+    vTaskDelay(pdMS_TO_TICKS(1));
+    
     // Match ROM again
     ow_write_byte(_gpio, DS18B20_CMD_MATCH_ROM);
     
@@ -340,6 +343,9 @@ bool SensorDS18B20::readScratchpad(size_t sensorIndex)
     for (int i = 0; i < 8; i++) {
         ow_write_byte(_gpio, _romIds[sensorIndex][i]);
     }
+    
+    // Small delay before read command for better reliability
+    vTaskDelay(pdMS_TO_TICKS(1));
     
     // Read scratchpad
     ow_write_byte(_gpio, DS18B20_CMD_READ_SCRATCHPAD);
@@ -352,7 +358,9 @@ bool SensorDS18B20::readScratchpad(size_t sensorIndex)
     
     // Verify CRC
     if (calculateCRC8(data, 8) != data[8]) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "CRC mismatch for sensor #" + std::to_string(sensorIndex + 1));
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "CRC mismatch for sensor #" + std::to_string(sensorIndex + 1) + 
+                            " (expected: 0x" + std::to_string(calculateCRC8(data, 8)) + 
+                            ", got: 0x" + std::to_string(data[8]) + ")");
         return false;
     }
     
@@ -432,7 +440,7 @@ void SensorDS18B20::readTask()
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task started");
     
     // Read all sensors with retry logic
-    const int maxRetries = 3;
+    const int maxRetries = 5;  // Increased from 3 to 5 for better transient error handling
     bool anySuccess = false;
     
     for (size_t sensorIndex = 0; sensorIndex < _romIds.size(); sensorIndex++) {
@@ -442,9 +450,12 @@ void SensorDS18B20::readTask()
             // Start conversion
             if (!startConversion(sensorIndex)) {
                 if (retry < maxRetries - 1) {
+                    // Exponential backoff: 50ms, 100ms, 150ms, 200ms, 250ms
+                    int delayMs = 50 + (retry * 50);
                     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to start conversion for sensor #" + 
-                                        std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1));
-                    vTaskDelay(pdMS_TO_TICKS(50));
+                                        std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1) + 
+                                        " after " + std::to_string(delayMs) + "ms");
+                    vTaskDelay(pdMS_TO_TICKS(delayMs));
                     continue;
                 }
                 break;
@@ -460,19 +471,27 @@ void SensorDS18B20::readTask()
                 
                 if (isConversionComplete(sensorIndex)) {
                     conversionComplete = true;
+                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Conversion completed for sensor #" + 
+                                        std::to_string(sensorIndex + 1) + " after ~" + std::to_string(elapsed) + "ms");
                     break;
                 }
             }
             
             if (!conversionComplete) {
                 if (retry < maxRetries - 1) {
+                    int delayMs = 50 + (retry * 50);
                     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Conversion timeout for sensor #" + 
-                                        std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1));
-                    vTaskDelay(pdMS_TO_TICKS(50));
+                                        std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1) + 
+                                        " after " + std::to_string(delayMs) + "ms");
+                    vTaskDelay(pdMS_TO_TICKS(delayMs));
                     continue;
                 }
                 break;
             }
+            
+            // Add settling delay after conversion completes to reduce CRC errors
+            // This gives the sensor time to stabilize the data before we read it
+            vTaskDelay(pdMS_TO_TICKS(3));
             
             // Read the data
             if (readScratchpad(sensorIndex)) {
@@ -480,9 +499,12 @@ void SensorDS18B20::readTask()
                 anySuccess = true;
                 break;
             } else if (retry < maxRetries - 1) {
+                // Exponential backoff on read failures
+                int delayMs = 50 + (retry * 50);
                 LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Read failed for sensor #" + 
-                                    std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1));
-                vTaskDelay(pdMS_TO_TICKS(50));
+                                    std::to_string(sensorIndex + 1) + " (likely CRC error), retry " + 
+                                    std::to_string(retry + 1) + " after " + std::to_string(delayMs) + "ms");
+                vTaskDelay(pdMS_TO_TICKS(delayMs));
             }
         }
         

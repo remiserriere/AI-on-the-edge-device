@@ -77,7 +77,7 @@ void SensorSHT3x::readTask()
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task started");
     
     // Read with retry logic
-    const int maxRetries = 3;
+    const int maxRetries = 5;  // Increased from 3 to 5 for better transient error handling
     bool success = false;
     
     for (int retry = 0; retry < maxRetries; retry++) {
@@ -97,9 +97,11 @@ void SensorSHT3x::readTask()
         
         if (ret != ESP_OK) {
             if (retry < maxRetries - 1) {
+                // Exponential backoff: 50ms, 100ms, 150ms, 200ms, 250ms
+                int delayMs = 50 + (retry * 50);
                 LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to send measurement command, retry " + 
-                                    std::to_string(retry + 1));
-                vTaskDelay(pdMS_TO_TICKS(50));
+                                    std::to_string(retry + 1) + " after " + std::to_string(delayMs) + "ms");
+                vTaskDelay(pdMS_TO_TICKS(delayMs));
                 continue;
             }
             break;
@@ -131,14 +133,22 @@ void SensorSHT3x::readTask()
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Measurement completed in ~" + 
                                     std::to_string(elapsed + pollIntervalMs) + "ms");
                 
+                // Add settling delay after data ready to reduce CRC errors
+                vTaskDelay(pdMS_TO_TICKS(2));
+                
                 // Verify CRC
-                if (calculateCRC(&data[0], 2) != data[2]) {
-                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Temperature CRC mismatch");
+                uint8_t tempCRC = calculateCRC(&data[0], 2);
+                uint8_t humCRC = calculateCRC(&data[3], 2);
+                
+                if (tempCRC != data[2]) {
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Temperature CRC mismatch (expected: 0x" + 
+                                        std::to_string(tempCRC) + ", got: 0x" + std::to_string(data[2]) + ")");
                     break;  // Try retry
                 }
                 
-                if (calculateCRC(&data[3], 2) != data[5]) {
-                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Humidity CRC mismatch");
+                if (humCRC != data[5]) {
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Humidity CRC mismatch (expected: 0x" + 
+                                        std::to_string(humCRC) + ", got: 0x" + std::to_string(data[5]) + ")");
                     break;  // Try retry
                 }
                 
@@ -168,8 +178,11 @@ void SensorSHT3x::readTask()
         }
         
         if (!measurementComplete && retry < maxRetries - 1) {
-            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Measurement timeout, retry " + std::to_string(retry + 1));
-            vTaskDelay(pdMS_TO_TICKS(50));
+            // Exponential backoff on measurement timeout
+            int delayMs = 50 + (retry * 50);
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Measurement timeout, retry " + 
+                                std::to_string(retry + 1) + " after " + std::to_string(delayMs) + "ms");
+            vTaskDelay(pdMS_TO_TICKS(delayMs));
         }
     }
     
