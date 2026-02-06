@@ -96,10 +96,57 @@ After configuring GPIO pins, connect your sensors with proper pull-up resistors:
 
 Finally, configure sensor-specific settings in `[SHT3x]` or `[DS18B20]` sections:
 - Enable the sensor
-- Set reading interval
+- Set reading interval (see Reading Intervals section below)
 - Configure MQTT/InfluxDB publishing
 
 See individual parameter documentation for details.
+
+## Reading Intervals and Power Efficiency
+
+The sensor system uses a power-efficient per-sensor task architecture:
+
+### How It Works
+- **Custom Intervals** (> 0): Each sensor gets its own FreeRTOS task that runs at the specified interval
+  - Example: `Interval = 30` creates a dedicated task that reads the sensor every 30 seconds
+  - Power efficient: CPU only wakes when that specific sensor needs to be read
+- **Follow Flow Mode** (Interval = -1): Sensor is read during the main flow cycle
+  - No dedicated task created
+  - Reading happens at the same interval as the main device flow
+
+### Examples
+
+**High-Frequency Monitoring:**
+```ini
+[AutoTimer]
+Interval = 10        ; Main flow runs every 10 minutes
+
+[SHT3x]
+Interval = 30        ; Dedicated task reads every 30 seconds
+```
+Result: 20 temperature/humidity readings per flow cycle, CPU wakes only when needed
+
+**Follow Flow Mode:**
+```ini
+[AutoTimer]
+Interval = 5         ; Main flow runs every 5 minutes
+
+[DS18B20]
+Interval = -1        ; Follow flow (default)
+```
+Result: 1 temperature reading per flow cycle, no extra CPU wake-ups
+
+**Mixed Configuration:**
+```ini
+[AutoTimer]
+Interval = 10        ; Main flow runs every 10 minutes
+
+[SHT3x]
+Interval = 60        ; Own task: reads every 1 minute
+
+[DS18B20]
+Interval = -1        ; Follow flow: reads every 10 minutes
+```
+Result: Optimal power usage with different monitoring frequencies per sensor
 
 ## Data Publishing
 
