@@ -46,35 +46,26 @@ public:
      */
     float getHumidity() const { return _humidity; }
     
-private:
-    enum class ReadState {
-        IDLE,               // Not currently reading
-        MEASURING,          // Measurement in progress
-        READING_DATA,       // Reading data from sensor
-        COMPLETE,           // Read complete
-        ERROR               // Error occurred
-    };
+    /**
+     * @brief Check if a read operation is currently in progress
+     * @return true if reading
+     */
+    bool isReadInProgress() const { return _readTaskHandle != nullptr; }
     
-    ReadState _state;
-    int64_t _measurementStartTime;  // Microseconds timestamp
-    int _retryCount;
+private:
     float _temperature;
     float _humidity;
     uint8_t _i2cAddress;
     i2c_port_t _i2cPort;
     bool _initialized;
+    TaskHandle_t _readTaskHandle;  // Handle for background read task
+    bool _readSuccess;  // Result of background read
     
     /**
-     * @brief Start measurement (non-blocking)
-     * @return true if measurement started successfully
+     * @brief Background task that polls sensor until measurement complete
      */
-    bool startMeasurement();
-    
-    /**
-     * @brief Check if measurement is complete and read data (non-blocking)
-     * @return true if data was read successfully, false if still measuring or error
-     */
-    bool tryReadMeasurement();
+    static void readTaskWrapper(void* pvParameters);
+    void readTask();
     
     /**
      * @brief Calculate CRC8 checksum for SHT3x

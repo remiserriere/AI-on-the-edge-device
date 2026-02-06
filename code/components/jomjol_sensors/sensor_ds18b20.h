@@ -61,29 +61,25 @@ public:
      */
     std::string getRomId(int index = 0) const;
     
+    /**
+     * @brief Check if a read operation is currently in progress
+     * @return true if reading
+     */
+    bool isReadInProgress() const { return _readTaskHandle != nullptr; }
+    
 private:
-    enum class ReadState {
-        IDLE,               // Not currently reading
-        CONVERTING,         // Conversion in progress
-        READING_SCRATCHPAD, // Reading data from sensor
-        COMPLETE,           // Read complete
-        ERROR               // Error occurred
-    };
-    
-    struct SensorState {
-        ReadState state = ReadState::IDLE;
-        int64_t conversionStartTime = 0;  // Microseconds timestamp
-        int retryCount = 0;
-        std::array<uint8_t, 8> romId;
-        float temperature = 0.0f;
-    };
-    
     std::vector<float> _temperatures;
     std::vector<std::array<uint8_t, 8>> _romIds; // Store ROM IDs for each sensor
-    std::vector<SensorState> _sensorStates;  // State for each sensor
     gpio_num_t _gpio;
     bool _initialized;
-    size_t _currentSensorIndex;  // Index of sensor currently being read
+    TaskHandle_t _readTaskHandle;  // Handle for background read task
+    bool _readSuccess;  // Result of background read
+    
+    /**
+     * @brief Background task that polls sensors until conversion complete
+     */
+    static void readTaskWrapper(void* pvParameters);
+    void readTask();
     
     /**
      * @brief Scan the 1-Wire bus for DS18B20 devices using ROM search
@@ -99,14 +95,14 @@ private:
     bool startConversion(size_t sensorIndex);
     
     /**
-     * @brief Check if conversion is complete (non-blocking)
+     * @brief Check if conversion is complete (non-blocking check only)
      * @param sensorIndex Index of sensor to check
      * @return true if conversion is complete
      */
     bool isConversionComplete(size_t sensorIndex);
     
     /**
-     * @brief Read scratchpad from sensor (non-blocking)
+     * @brief Read scratchpad from sensor
      * @param sensorIndex Index of sensor to read from
      * @return true if read was successful
      */

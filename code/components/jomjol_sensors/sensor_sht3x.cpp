@@ -28,8 +28,7 @@ SensorSHT3x::SensorSHT3x(uint8_t address,
                          bool mqttEnabled,
                          bool influxEnabled)
     : _temperature(0.0f), _humidity(0.0f), _i2cAddress(address),
-      _i2cPort(I2C_NUM_0), _initialized(false), _state(ReadState::IDLE),
-      _measurementStartTime(0), _retryCount(0)
+      _i2cPort(I2C_NUM_0), _initialized(false), _readTaskHandle(nullptr), _readSuccess(false)
 {
     _mqttTopic = mqttTopic;
     _influxMeasurement = influxMeasurement;
@@ -41,6 +40,11 @@ SensorSHT3x::SensorSHT3x(uint8_t address,
 
 SensorSHT3x::~SensorSHT3x()
 {
+    // Stop background task if running
+    if (_readTaskHandle != nullptr) {
+        vTaskDelete(_readTaskHandle);
+        _readTaskHandle = nullptr;
+    }
 }
 
 bool SensorSHT3x::init()

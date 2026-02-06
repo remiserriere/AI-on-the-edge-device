@@ -35,7 +35,7 @@ SensorDS18B20::SensorDS18B20(gpio_num_t gpio,
                              int interval,
                              bool mqttEnabled,
                              bool influxEnabled)
-    : _gpio(gpio), _initialized(false), _currentSensorIndex(0)
+    : _gpio(gpio), _initialized(false), _readTaskHandle(nullptr), _readSuccess(false)
 {
     _mqttTopic = mqttTopic;
     _influxMeasurement = influxMeasurement;
@@ -47,6 +47,12 @@ SensorDS18B20::SensorDS18B20(gpio_num_t gpio,
 
 SensorDS18B20::~SensorDS18B20()
 {
+    // Stop background task if running
+    if (_readTaskHandle != nullptr) {
+        vTaskDelete(_readTaskHandle);
+        _readTaskHandle = nullptr;
+    }
+    
     if (_initialized) {
         gpio_reset_pin(_gpio);
     }
@@ -445,111 +451,127 @@ bool SensorDS18B20::init()
     return true;
 }
 
+void SensorDS18B20::readTaskWrapper(void* pvParameters)
+{
+    SensorDS18B20* sensor = static_cast<SensorDS18B20*>(pvParameters);
+    sensor->readTask();
+}
+
+void SensorDS18B20::readTask()
+{
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task started");
+    
+    // Read all sensors with retry logic
+    const int maxRetries = 3;
+    bool anySuccess = false;
+    
+    for (size_t sensorIndex = 0; sensorIndex < _romIds.size(); sensorIndex++) {
+        bool success = false;
+        
+        for (int retry = 0; retry < maxRetries; retry++) {
+            // Start conversion
+            if (!startConversion(sensorIndex)) {
+                if (retry < maxRetries - 1) {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to start conversion for sensor #" + 
+                                        std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1));
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                    continue;
+                }
+                break;
+            }
+            
+            // Poll for completion - yields to other tasks
+            bool conversionComplete = false;
+            const int maxWaitMs = 1000;
+            const int pollIntervalMs = 10;
+            
+            for (int elapsed = 0; elapsed < maxWaitMs; elapsed += pollIntervalMs) {
+                vTaskDelay(pdMS_TO_TICKS(pollIntervalMs));
+                
+                if (isConversionComplete(sensorIndex)) {
+                    conversionComplete = true;
+                    break;
+                }
+            }
+            
+            if (!conversionComplete) {
+                if (retry < maxRetries - 1) {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Conversion timeout for sensor #" + 
+                                        std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1));
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                    continue;
+                }
+                break;
+            }
+            
+            // Read the data
+            if (readScratchpad(sensorIndex)) {
+                success = true;
+                anySuccess = true;
+                break;
+            } else if (retry < maxRetries - 1) {
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Read failed for sensor #" + 
+                                    std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1));
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
+        }
+        
+        if (!success) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor #" + 
+                                std::to_string(sensorIndex + 1) + " after " + std::to_string(maxRetries) + " attempts");
+        }
+    }
+    
+    _readSuccess = anySuccess;
+    
+    if (anySuccess) {
+        _lastRead = time(nullptr);
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task completed successfully");
+    } else {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Background read task failed to read any sensors");
+    }
+    
+    // Task deletes itself
+    _readTaskHandle = nullptr;
+    vTaskDelete(NULL);
+}
+
 bool SensorDS18B20::readData()
 {
     if (!_initialized) {
         return false;
     }
     
+    // Check if a read is already in progress
+    if (_readTaskHandle != nullptr) {
+        // Read still in progress, return false (not complete yet)
+        return false;
+    }
+    
     // Note: shouldRead() check is done by SensorManager::update() before calling this
-    // We don't check it again here to avoid breaking "follow flow" mode
+    // Start a background task to read sensors asynchronously
+    // This task will poll sensors and delete itself when done
     
-    // Async state machine - processes one step per call, doesn't block
-    // This allows other tasks to run while sensors are converting
+    BaseType_t xReturned = xTaskCreatePinnedToCore(
+        &SensorDS18B20::readTaskWrapper,
+        "ds18b20_read",
+        4096,  // Stack size
+        this,  // Parameter
+        tskIDLE_PRIORITY + 1,  // Priority
+        &_readTaskHandle,
+        0  // Core 0
+    );
     
-    const int maxRetries = 3;
-    
-    // Process current sensor based on its state
-    if (_currentSensorIndex >= _sensorStates.size()) {
-        // All sensors processed - check if any succeeded
-        bool anySuccess = false;
-        for (size_t i = 0; i < _sensorStates.size(); i++) {
-            if (_sensorStates[i].state == ReadState::COMPLETE) {
-                anySuccess = true;
-            }
-            // Reset states for next read cycle
-            _sensorStates[i].state = ReadState::IDLE;
-            _sensorStates[i].retryCount = 0;
-        }
-        
-        _currentSensorIndex = 0;
-        
-        if (anySuccess) {
-            _lastRead = time(nullptr);
-            return true;
-        } else {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read any DS18B20 sensors");
-            return false;
-        }
+    if (xReturned != pdPASS) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to create background read task");
+        _readTaskHandle = nullptr;
+        return false;
     }
     
-    SensorState& state = _sensorStates[_currentSensorIndex];
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Started background read task (true async)");
     
-    switch (state.state) {
-        case ReadState::IDLE:
-            // Start conversion for this sensor
-            if (startConversion(_currentSensorIndex)) {
-                state.state = ReadState::CONVERTING;
-            } else {
-                // Start failed, try next sensor
-                state.state = ReadState::ERROR;
-                _currentSensorIndex++;
-            }
-            break;
-            
-        case ReadState::CONVERTING:
-            // Check if conversion is complete (non-blocking)
-            if (isConversionComplete(_currentSensorIndex)) {
-                state.state = ReadState::READING_SCRATCHPAD;
-            } else if (state.state == ReadState::ERROR) {
-                // Timeout occurred, handle retry or move to next sensor
-                if (state.retryCount < maxRetries - 1) {
-                    state.retryCount++;
-                    state.state = ReadState::IDLE;  // Retry
-                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Conversion timeout for sensor #" + 
-                                        std::to_string(_currentSensorIndex + 1) + ", retry " + 
-                                        std::to_string(state.retryCount) + "/" + std::to_string(maxRetries - 1));
-                } else {
-                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor #" + 
-                                        std::to_string(_currentSensorIndex + 1) + " after " + 
-                                        std::to_string(maxRetries) + " attempts");
-                    _currentSensorIndex++;
-                }
-            }
-            // If still converting, return true to be called again later
-            return true;
-            
-        case ReadState::READING_SCRATCHPAD:
-            // Read the data (non-blocking)
-            if (readScratchpad(_currentSensorIndex)) {
-                state.state = ReadState::COMPLETE;
-                _currentSensorIndex++;
-            } else {
-                // Read failed, try retry
-                if (state.retryCount < maxRetries - 1) {
-                    state.retryCount++;
-                    state.state = ReadState::IDLE;  // Retry from beginning
-                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Read failed for sensor #" + 
-                                        std::to_string(_currentSensorIndex + 1) + ", retry " + 
-                                        std::to_string(state.retryCount) + "/" + std::to_string(maxRetries - 1));
-                } else {
-                    state.state = ReadState::ERROR;
-                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor #" + 
-                                        std::to_string(_currentSensorIndex + 1) + " after " + 
-                                        std::to_string(maxRetries) + " attempts");
-                    _currentSensorIndex++;
-                }
-            }
-            break;
-            
-        case ReadState::COMPLETE:
-        case ReadState::ERROR:
-            // Move to next sensor
-            _currentSensorIndex++;
-            break;
-    }
-    
-    // Return true to continue being called (still processing sensors)
+    // Return true to indicate read was initiated
+    // The task will complete in background
     return true;
 }
 
