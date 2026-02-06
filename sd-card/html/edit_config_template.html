@@ -2570,20 +2570,6 @@ function UpdateInput() {
     WriteParameter(param, category, "System", "RSSIThreshold", true);
     WriteParameter(param, category, "System", "CPUFrequency", true);
 
-    WriteParameter(param, category, "SHT3x", "Address", false);
-    WriteParameter(param, category, "SHT3x", "Interval", false);
-    WriteParameter(param, category, "SHT3x", "I2C_Frequency", false);
-    WriteParameter(param, category, "SHT3x", "MQTT_Enable", false);
-    WriteParameter(param, category, "SHT3x", "MQTT_Topic", false);
-    WriteParameter(param, category, "SHT3x", "InfluxDB_Enable", false);
-    WriteParameter(param, category, "SHT3x", "InfluxDB_Measurement", false);
-
-    WriteParameter(param, category, "DS18B20", "Interval", false);
-    WriteParameter(param, category, "DS18B20", "MQTT_Enable", false);
-    WriteParameter(param, category, "DS18B20", "MQTT_Topic", false);
-    WriteParameter(param, category, "DS18B20", "InfluxDB_Enable", false);
-    WriteParameter(param, category, "DS18B20", "InfluxDB_Measurement", false);
-
     WriteModelFiles();
 }
 
