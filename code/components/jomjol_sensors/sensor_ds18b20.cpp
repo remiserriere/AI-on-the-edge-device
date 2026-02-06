@@ -290,7 +290,8 @@ std::string SensorDS18B20::getRomId(int index) const
                  _romIds[index][7]); // CRC byte
         return std::string(buffer);
     }
-    return "Unknown";
+    // Return placeholder format if ROM IDs not yet read
+    return "28-00000000000000";
 }
 
 int SensorDS18B20::scanDevices()
