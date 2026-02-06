@@ -164,6 +164,15 @@ bool SensorDS18B20::init()
     if (readOneSensor(temp)) {
         _temperatures.clear();
         _temperatures.push_back(temp);
+        
+        // Set timestamp for initial read
+        _lastRead = time(nullptr);
+        
+        // Store placeholder ROM ID (actual ROM search not implemented yet)
+        _romIds.clear();
+        std::array<uint8_t, 8> placeholderRom = {0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        _romIds.push_back(placeholderRom);
+        
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 sensor initialized successfully. Temp: " + 
                             std::to_string(temp) + "°C");
     } else {
