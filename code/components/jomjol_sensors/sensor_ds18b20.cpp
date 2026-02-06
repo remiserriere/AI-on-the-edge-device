@@ -253,8 +253,11 @@ int SensorDS18B20::performRomSearch(std::vector<std::array<uint8_t, 8>>& romIds)
                     romIds.push_back(romBuffer);
                     searchResult = true;
                 } else {
-                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Found non-DS18B20 device with family code: 0x" + 
-                                        std::to_string(romBuffer[0]));
+                    // Format family code as proper hex
+                    char familyCodeHex[8];
+                    snprintf(familyCodeHex, sizeof(familyCodeHex), "0x%02X", romBuffer[0]);
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Found non-DS18B20 device with family code: " + 
+                                        std::string(familyCodeHex));
                 }
             } else {
                 LogFile.WriteToFile(ESP_LOG_WARN, TAG, "CRC mismatch in ROM search");
