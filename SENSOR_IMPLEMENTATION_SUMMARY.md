@@ -1,5 +1,5 @@
 # External Sensors Implementation Summary
-
+ 
 ## Overview
 
 Added comprehensive support for external temperature and humidity sensors to AI-on-the-edge-device, enabling device health and safety monitoring - especially critical for outdoor installations.
