@@ -17,13 +17,6 @@ extern InfluxDB influxDB;
 
 static const char *TAG = "SHT3x";
 
-// Helper function to format float with 1 decimal place
-static std::string formatValue(float value) {
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%.1f", value);
-    return std::string(buf);
-}
-
 // SHT3x I2C commands
 #define SHT3X_CMD_MEASURE_HIGH_REP 0x2400  // High repeatability measurement
 #define SHT3X_CMD_SOFT_RESET       0x30A2  // Soft reset command
@@ -180,8 +173,8 @@ bool SensorSHT3x::readData()
     _humidity = hum;
     _lastRead = time(nullptr);
     
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read: Temp=" + formatValue(_temperature) + 
-                        "°C, Humidity=" + formatValue(_humidity) + "%");
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read: Temp=" + std::to_string(_temperature) + 
+                        "°C, Humidity=" + std::to_string(_humidity) + "%");
     
     return true;
 }
@@ -195,12 +188,12 @@ void SensorSHT3x::publishMQTT()
     
     // Publish temperature
     std::string tempTopic = _mqttTopic + "/temperature";
-    std::string tempValue = formatValue(_temperature);
+    std::string tempValue = std::to_string(_temperature);
     MQTTPublish(tempTopic, tempValue, 1, true);
     
     // Publish humidity
     std::string humTopic = _mqttTopic + "/humidity";
-    std::string humValue = formatValue(_humidity);
+    std::string humValue = std::to_string(_humidity);
     MQTTPublish(humTopic, humValue, 1, true);
     
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to MQTT");
@@ -219,13 +212,13 @@ void SensorSHT3x::publishInfluxDB()
     // Publish temperature
     influxDB.InfluxDBPublish(_influxMeasurement, 
                              "temperature", 
-                             formatValue(_temperature), 
+                             std::to_string(_temperature), 
                              now);
     
     // Publish humidity
     influxDB.InfluxDBPublish(_influxMeasurement, 
                              "humidity", 
-                             formatValue(_humidity), 
+                             std::to_string(_humidity), 
                              now);
     
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to InfluxDB");
