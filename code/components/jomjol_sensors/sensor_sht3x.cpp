@@ -235,6 +235,8 @@ bool SensorSHT3x::readData()
     // The task will complete in background
     return true;
 }
+
+bool SensorSHT3x::init()
 {
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initializing SHT3x sensor at address 0x" + 
                         std::to_string(_i2cAddress));
