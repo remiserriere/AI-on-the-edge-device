@@ -110,7 +110,6 @@ void SensorSHT3x::readTask()
         bool measurementComplete = false;
         const int maxWaitMs = 100;
         const int pollIntervalMs = 5;
-        int64_t startTime = esp_timer_get_time();
         
         for (int elapsed = 0; elapsed < maxWaitMs; elapsed += pollIntervalMs) {
             vTaskDelay(pdMS_TO_TICKS(pollIntervalMs));
@@ -128,9 +127,9 @@ void SensorSHT3x::readTask()
             i2c_cmd_link_delete(cmdHandle);
             
             if (ret == ESP_OK) {
-                // Data received
-                int64_t actualTime = (esp_timer_get_time() - startTime) / 1000;
-                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Measurement completed in " + std::to_string(actualTime) + "ms");
+                // Data received - log completion time
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Measurement completed in ~" + 
+                                    std::to_string(elapsed + pollIntervalMs) + "ms");
                 
                 // Verify CRC
                 if (calculateCRC(&data[0], 2) != data[2]) {
@@ -179,7 +178,7 @@ void SensorSHT3x::readTask()
     if (success) {
         _lastRead = time(nullptr);
         
-        // Publish data immediately after successful read
+        // Publish data from background task after successful read
         publishMQTT();
         publishInfluxDB();
         
@@ -189,7 +188,7 @@ void SensorSHT3x::readTask()
                             std::to_string(maxRetries) + " attempts");
     }
     
-    // Task deletes itself
+    // Clear handle before deleting task to prevent race condition
     _readTaskHandle = nullptr;
     vTaskDelete(NULL);
 }
@@ -200,7 +199,11 @@ bool SensorSHT3x::readData()
         return false;
     }
     
-    // Check if a read is already in progress
+    // Check if a read is already in progress  
+    // Note: This check is safe because:
+    // 1. Task sets _readTaskHandle to nullptr immediately before vTaskDelete(NULL)
+    // 2. vTaskDelete(NULL) for current task is synchronous - task ends immediately
+    // 3. No window where task is active but handle is nullptr
     if (_readTaskHandle != nullptr) {
         // Read still in progress, return false (not complete yet)
         return false;

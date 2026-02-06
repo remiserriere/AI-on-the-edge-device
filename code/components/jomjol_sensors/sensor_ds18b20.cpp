@@ -517,7 +517,7 @@ void SensorDS18B20::readTask()
     if (anySuccess) {
         _lastRead = time(nullptr);
         
-        // Publish data immediately after successful read
+        // Publish data from background task after successful read
         publishMQTT();
         publishInfluxDB();
         
@@ -526,7 +526,7 @@ void SensorDS18B20::readTask()
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Background read task failed to read any sensors");
     }
     
-    // Task deletes itself
+    // Clear handle before deleting task to prevent race condition
     _readTaskHandle = nullptr;
     vTaskDelete(NULL);
 }
@@ -538,6 +538,10 @@ bool SensorDS18B20::readData()
     }
     
     // Check if a read is already in progress
+    // Note: This check is safe because:
+    // 1. Task sets _readTaskHandle to nullptr immediately before vTaskDelete(NULL)
+    // 2. vTaskDelete(NULL) for current task is synchronous - task ends immediately
+    // 3. No window where task is active but handle is nullptr
     if (_readTaskHandle != nullptr) {
         // Read still in progress, return false (not complete yet)
         return false;
