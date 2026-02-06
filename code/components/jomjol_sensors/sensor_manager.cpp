@@ -202,7 +202,16 @@ void SensorManager::update(int flowInterval)
     }
     
     for (auto& sensor : _sensors) {
+        // For sensors with custom intervals, their periodic tasks handle reading
+        // Only process "follow flow" sensors here (interval = -1)
+        if (sensor->getReadInterval() > 0) {
+            continue;
+        }
+        
         if (sensor->shouldRead(flowInterval)) {
+            // Call readData() - uses efficient polling with vTaskDelay()
+            // This yields to other tasks between checks, maintaining power efficiency
+            // The sensor will poll hardware status and return when complete
             if (sensor->readData()) {
                 sensor->publishMQTT();
                 sensor->publishInfluxDB();

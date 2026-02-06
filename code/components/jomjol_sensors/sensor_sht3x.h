@@ -47,6 +47,17 @@ public:
     float getHumidity() const { return _humidity; }
     
 private:
+    enum class ReadState {
+        IDLE,               // Not currently reading
+        MEASURING,          // Measurement in progress
+        READING_DATA,       // Reading data from sensor
+        COMPLETE,           // Read complete
+        ERROR               // Error occurred
+    };
+    
+    ReadState _state;
+    int64_t _measurementStartTime;  // Microseconds timestamp
+    int _retryCount;
     float _temperature;
     float _humidity;
     uint8_t _i2cAddress;
@@ -54,12 +65,16 @@ private:
     bool _initialized;
     
     /**
-     * @brief Send measurement command and read result
-     * @param temp Output temperature value
-     * @param hum Output humidity value
-     * @return true if successful
+     * @brief Start measurement (non-blocking)
+     * @return true if measurement started successfully
      */
-    bool measureAndRead(float& temp, float& hum);
+    bool startMeasurement();
+    
+    /**
+     * @brief Check if measurement is complete and read data (non-blocking)
+     * @return true if data was read successfully, false if still measuring or error
+     */
+    bool tryReadMeasurement();
     
     /**
      * @brief Calculate CRC8 checksum for SHT3x
