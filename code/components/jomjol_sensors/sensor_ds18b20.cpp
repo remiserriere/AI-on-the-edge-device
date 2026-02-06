@@ -281,11 +281,13 @@ std::string SensorDS18B20::getRomId(int index) const
 {
     if (index >= 0 && index < (int)_romIds.size()) {
         char buffer[32];
-        // Format as "28-XXXXXXXXXXXX" where 28 is the family code for DS18B20
-        snprintf(buffer, sizeof(buffer), "%02X-%02X%02X%02X%02X%02X%02X",
+        // Format as "28-XXXXXXXXXXXXXX" where 28 is the family code for DS18B20
+        // ROM format: [0]=family, [1-6]=serial, [7]=CRC
+        snprintf(buffer, sizeof(buffer), "%02X-%02X%02X%02X%02X%02X%02X%02X",
                  _romIds[index][0],  // Family code (should be 0x28)
                  _romIds[index][6], _romIds[index][5], _romIds[index][4],
-                 _romIds[index][3], _romIds[index][2], _romIds[index][1]);
+                 _romIds[index][3], _romIds[index][2], _romIds[index][1],
+                 _romIds[index][7]); // CRC byte
         return std::string(buffer);
     }
     return "Unknown";
