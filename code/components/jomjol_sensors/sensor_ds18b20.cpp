@@ -449,9 +449,8 @@ bool SensorDS18B20::readData()
         return false;
     }
     
-    if (!shouldRead()) {
-        return false;
-    }
+    // Note: shouldRead() check is done by SensorManager::update() before calling this
+    // We don't check it again here to avoid breaking "follow flow" mode
     
     // Read temperatures from all previously discovered sensors
     // Note: This does NOT perform ROM search - sensors were discovered once at startup
