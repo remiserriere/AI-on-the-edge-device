@@ -229,7 +229,7 @@ esp_err_t hello_main_handler(httpd_req_t *req)
     std::string filetosend(base_path);
 
     const char *filename = get_path_from_uri(filepath, base_path,
-                                             req->uri, sizeof(filepath));
+                                         req->uri - 1, sizeof(filepath));   
     ESP_LOGD(TAG, "1 uri: %s, filename: %s, filepath: %s", req->uri, filename, filepath);
 
     if ((strcmp(req->uri, "/") == 0))
