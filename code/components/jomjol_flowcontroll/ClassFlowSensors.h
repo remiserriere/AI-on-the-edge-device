@@ -40,6 +40,12 @@ private:
     std::unique_ptr<SensorManager> _sensorManager;
     ClassFlowControll* _flowController;
     bool _initialized;
+    
+    // Background task for periodic sensor updates
+    TaskHandle_t _sensorTaskHandle;
+    static void sensorUpdateTask(void* pvParameters);
+    void startSensorUpdateTask();
+    void stopSensorUpdateTask();
 };
 
 #endif // CLASSFLOWSENSORS_H

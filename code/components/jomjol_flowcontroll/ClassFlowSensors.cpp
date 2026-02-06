@@ -5,29 +5,24 @@
 #include "../../include/defines.h"
 
 #include <sstream>
-#include <cstdio>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "FLOW_SENSORS";
 
-// Helper function to format float with 1 decimal place
-static std::string formatFloat(float value) {
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%.1f", value);
-    return std::string(buf);
-}
-
-ClassFlowSensors::ClassFlowSensors() : _initialized(false)
+ClassFlowSensors::ClassFlowSensors() : _initialized(false), _sensorTaskHandle(nullptr)
 {
     SetInitialParameter();
 }
 
-ClassFlowSensors::ClassFlowSensors(std::vector<ClassFlow*>* lfc) : _initialized(false)
+ClassFlowSensors::ClassFlowSensors(std::vector<ClassFlow*>* lfc) : _initialized(false), _sensorTaskHandle(nullptr)
 {
     SetInitialParameter();
     ListFlowControll = lfc;
 }
 
-ClassFlowSensors::ClassFlowSensors(std::vector<ClassFlow*>* lfc, ClassFlow *_prev) : _initialized(false)
+ClassFlowSensors::ClassFlowSensors(std::vector<ClassFlow*>* lfc, ClassFlow *_prev) : _initialized(false), _sensorTaskHandle(nullptr)
 {
     SetInitialParameter();
     previousElement = _prev;
@@ -36,6 +31,7 @@ ClassFlowSensors::ClassFlowSensors(std::vector<ClassFlow*>* lfc, ClassFlow *_pre
 
 ClassFlowSensors::~ClassFlowSensors()
 {
+    stopSensorUpdateTask();
     if (_sensorManager) {
         _sensorManager->deinit();
     }
@@ -47,6 +43,7 @@ void ClassFlowSensors::SetInitialParameter(void)
     _sensorManager = nullptr;
     _flowController = nullptr;
     _initialized = false;
+    _sensorTaskHandle = nullptr;
 }
 
 bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
@@ -107,6 +104,9 @@ bool ClassFlowSensors::doFlow(std::string time)
         }
         _initialized = true;
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sensors initialized successfully");
+        
+        // Start background task for periodic sensor updates (for custom intervals)
+        startSensorUpdateTask();
     }
     
     // Get the flow interval from the controller for "follow flow" mode
@@ -117,7 +117,7 @@ bool ClassFlowSensors::doFlow(std::string time)
         float intervalMinutes = _flowController->getAutoInterval();
         flowIntervalSeconds = (int)(intervalMinutes * 60);  // Convert minutes to seconds
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Using flow interval: " + 
-                            formatFloat(intervalMinutes) + " min (" + 
+                            std::to_string(intervalMinutes) + " min (" + 
                             std::to_string(flowIntervalSeconds) + " sec)");
     } else {
         LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Flow controller not set, using default interval");
@@ -128,4 +128,59 @@ bool ClassFlowSensors::doFlow(std::string time)
     _sensorManager->update(flowIntervalSeconds);
     
     return true;
+}
+
+// Background task for periodic sensor updates
+// This allows sensors with custom intervals shorter than flow interval to be read properly
+void ClassFlowSensors::sensorUpdateTask(void* pvParameters)
+{
+    ClassFlowSensors* self = static_cast<ClassFlowSensors*>(pvParameters);
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sensor update task started");
+    
+    // Check sensors every 1 second
+    const TickType_t xDelay = 1000 / portTICK_PERIOD_MS;
+    
+    while (true) {
+        if (self->_sensorManager && self->_sensorManager->isEnabled()) {
+            // Pass 0 as flow interval - sensors will use their own custom intervals
+            self->_sensorManager->update(0);
+        }
+        
+        vTaskDelay(xDelay);
+    }
+}
+
+void ClassFlowSensors::startSensorUpdateTask()
+{
+    if (_sensorTaskHandle != nullptr) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Sensor update task already running");
+        return;
+    }
+    
+    BaseType_t xReturned = xTaskCreatePinnedToCore(
+        &ClassFlowSensors::sensorUpdateTask,
+        "sensor_update",
+        4096,  // Stack size
+        this,  // Parameter passed to task
+        tskIDLE_PRIORITY + 1,  // Priority (lower than main flow)
+        &_sensorTaskHandle,
+        0  // Core 0
+    );
+    
+    if (xReturned != pdPASS) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to create sensor update task");
+        _sensorTaskHandle = nullptr;
+    } else {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sensor update task created successfully");
+    }
+}
+
+void ClassFlowSensors::stopSensorUpdateTask()
+{
+    if (_sensorTaskHandle != nullptr) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Stopping sensor update task");
+        vTaskDelete(_sensorTaskHandle);
+        _sensorTaskHandle = nullptr;
+    }
 }
