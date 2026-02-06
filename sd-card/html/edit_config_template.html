@@ -3429,7 +3429,10 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
             }		
         }
 	    
-        document.getElementById(_cat+"_"+_name+"_text").style.color = "black"
+        let textElement = document.getElementById(_cat+"_"+_name+"_text");
+        if (textElement) {
+            textElement.style.color = "black";
+        }
         setEnabled(_cat+"_"+_name, true);
 
         for (var j = 1; j <= anzpara; ++j) {
@@ -3476,7 +3479,10 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
             }		
         }
 		
-        document.getElementById(_cat+"_"+_name+"_text").style.color = "black"
+        let textElement = document.getElementById(_cat+"_"+_name+"_text");
+        if (textElement) {
+            textElement.style.color = "black";
+        }
         setEnabled(_cat+"_"+_name, true);
 
         for (var j = 1; j <= anzpara; ++j) {
