@@ -305,10 +305,6 @@ bool SensorDS18B20::startConversion(size_t sensorIndex)
     // Start temperature conversion
     ow_write_byte(_gpio, DS18B20_CMD_CONVERT_T);
     
-    // Record start time
-    _sensorStates[sensorIndex].conversionStartTime = esp_timer_get_time();
-    _sensorStates[sensorIndex].state = ReadState::CONVERTING;
-    
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Started conversion for sensor #" + std::to_string(sensorIndex + 1));
     
     return true;
@@ -316,29 +312,13 @@ bool SensorDS18B20::startConversion(size_t sensorIndex)
 
 bool SensorDS18B20::isConversionComplete(size_t sensorIndex)
 {
-    if (sensorIndex >= _sensorStates.size()) {
-        return false;
-    }
-    
-    // Check timeout first (1000ms max)
-    int64_t elapsed = (esp_timer_get_time() - _sensorStates[sensorIndex].conversionStartTime) / 1000;
-    if (elapsed > 1000) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Conversion timeout for sensor #" + std::to_string(sensorIndex + 1) + 
-                            " after " + std::to_string(elapsed) + "ms");
-        _sensorStates[sensorIndex].state = ReadState::ERROR;
+    if (sensorIndex >= _romIds.size()) {
         return false;
     }
     
     // Check if conversion is complete by reading the bus
     // DS18B20 pulls line low during conversion, releases when done
-    if (ow_read(_gpio)) {
-        int64_t actualTime = (esp_timer_get_time() - _sensorStates[sensorIndex].conversionStartTime) / 1000;
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Conversion completed for sensor #" + std::to_string(sensorIndex + 1) + 
-                            " in " + std::to_string(actualTime) + "ms");
-        return true;
-    }
-    
-    return false;
+    return ow_read(_gpio);
 }
 
 bool SensorDS18B20::readScratchpad(size_t sensorIndex)
@@ -380,7 +360,7 @@ bool SensorDS18B20::readScratchpad(size_t sensorIndex)
     int16_t rawTemp = (data[1] << 8) | data[0];
     float temp = (float)rawTemp / 16.0f;
     
-    _sensorStates[sensorIndex].temperature = temp;
+    // Update temperature directly
     _temperatures[sensorIndex] = temp;
     
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensor #" + std::to_string(sensorIndex + 1) + 
