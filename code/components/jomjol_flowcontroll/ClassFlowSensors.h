@@ -7,6 +7,7 @@
 #include <memory>
 
 class SensorManager;
+class ClassFlowControll;
 
 class ClassFlowSensors : public ClassFlow
 {
@@ -26,11 +27,18 @@ public:
      */
     SensorManager* getSensorManager() { return _sensorManager.get(); }
     
+    /**
+     * @brief Set flow controller reference for accessing flow interval
+     * @param controller Pointer to the flow controller
+     */
+    void setFlowControll(ClassFlowControll* controller) { _flowController = controller; }
+    
 protected:
     void SetInitialParameter(void) override;
     
 private:
     std::unique_ptr<SensorManager> _sensorManager;
+    ClassFlowControll* _flowController;
     bool _initialized;
 };
 

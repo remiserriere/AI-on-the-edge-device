@@ -1,4 +1,5 @@
 #include "ClassFlowSensors.h"
+#include "ClassFlowControll.h"
 #include "sensor_manager.h"
 #include "ClassLogFile.h"
 #include "../../include/defines.h"
@@ -36,6 +37,7 @@ void ClassFlowSensors::SetInitialParameter(void)
 {
     disabled = false;
     _sensorManager = nullptr;
+    _flowController = nullptr;
     _initialized = false;
 }
 
@@ -99,10 +101,23 @@ bool ClassFlowSensors::doFlow(std::string time)
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sensors initialized successfully");
     }
     
+    // Get the flow interval from the controller for "follow flow" mode
+    // The AutoInterval is in minutes, we need to convert to seconds
+    int flowIntervalSeconds = 0;
+    
+    if (_flowController) {
+        float intervalMinutes = _flowController->getAutoInterval();
+        flowIntervalSeconds = (int)(intervalMinutes * 60);  // Convert minutes to seconds
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Using flow interval: " + 
+                            std::to_string(intervalMinutes) + " min (" + 
+                            std::to_string(flowIntervalSeconds) + " sec)");
+    } else {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Flow controller not set, using default interval");
+    }
+    
     // Update sensors (read and publish if interval elapsed)
-    // For "follow flow" mode, sensors check their own interval
-    // Passing 1 as a dummy value since sensors manage their own timing
-    _sensorManager->update(1);
+    // Pass the actual flow interval for "follow flow" mode sensors
+    _sensorManager->update(flowIntervalSeconds);
     
     return true;
 }

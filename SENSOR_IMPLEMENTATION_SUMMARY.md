@@ -8,22 +8,24 @@ Added comprehensive support for external temperature and humidity sensors to AI-
 
 ### Supported Sensors
 1. **SHT3x** (I²C) - Temperature (-40°C to +125°C) and Humidity (0-100% RH)
-2. **DS18B20** (1-Wire) - Temperature (-55°C to +125°C), chainable
+2. **DS18B20** (1-Wire) - Temperature (-55°C to +125°C), chainable with full ROM search support
 
 ### Integration Points
 - ✅ GPIO configuration via existing [GPIO] section (new modes: i2c-sda, i2c-scl, onewire)
 - ✅ Dedicated [SHT3x] and [DS18B20] configuration sections
-- ✅ MQTT publishing with configurable topics
-- ✅ InfluxDB logging for trending
+- ✅ MQTT publishing with configurable topics (includes ROM IDs for DS18B20)
+- ✅ InfluxDB logging for trending (includes ROM IDs for DS18B20)
 - ✅ "Follow flow" mode (interval = -1) or custom intervals
 - ✅ Full web UI configuration
+- ✅ **Multi-DS18B20 support with ROM search** - automatically discovers all sensors on the bus
 
 ### Architecture
 - New `jomjol_sensors` component with modular design
 - `ClassFlowSensors` integrated into flow control architecture
 - Automatic GPIO pin detection from configuration
 - Native I²C driver (ESP-IDF) with CRC validation
-- Bit-banging 1-Wire implementation (no external dependencies)
+- Bit-banging 1-Wire implementation with ROM search (no external dependencies)
+- Standard Dallas/Maxim 1-Wire ROM search algorithm for device discovery
 
 ## Configuration Example
 
@@ -297,16 +299,11 @@ Documentation:
    - Impact: Minimal on typical 5-10 minute flow cycles
    - Future: Could implement async reading
 
-2. **Single DS18B20**: Current implementation uses Skip ROM (single device)
-   - Impact: Multiple sensors require ROM search implementation
-   - Workaround: Documentation describes chaining, but code reads one sensor
-   - Future: Implement full ROM search algorithm
-
-3. **GPIO Pins**: Limited to IO1, IO3, IO12, IO13
+2. **GPIO Pins**: Limited to IO1, IO3, IO12, IO13
    - Impact: Other GPIOs may conflict with camera/SD
    - Mitigation: Clear documentation of safe pins
 
-4. **No Auto-Discovery**: Home Assistant discovery not implemented
+3. **No Auto-Discovery**: Home Assistant discovery not implemented
    - Impact: Manual sensor configuration required
    - Workaround: Example YAML provided in docs
    - Future: Add MQTT discovery messages
@@ -314,13 +311,12 @@ Documentation:
 ## Future Enhancements
 
 1. **Additional Sensors**: BME280, BME680, DHT22, AHT20
-2. **ROM Search**: Full DS18B20 multi-sensor support with ROM identification
-3. **HA Discovery**: Automatic Home Assistant entity creation
-4. **Async 1-Wire**: Non-blocking DS18B20 reads
-5. **Sensor Calibration**: Offset/scaling configuration
-6. **Alert System**: Built-in threshold alerts (email/webhook)
-7. **Data Retention**: Local SD card logging
-8. **Graphing**: Built-in web UI graphs
+2. **HA Discovery**: Automatic Home Assistant entity creation
+3. **Async 1-Wire**: Non-blocking DS18B20 reads
+4. **Sensor Calibration**: Offset/scaling configuration
+5. **Alert System**: Built-in threshold alerts (email/webhook)
+6. **Data Retention**: Local SD card logging
+7. **Graphing**: Built-in web UI graphs
 
 ## Documentation
 

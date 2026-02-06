@@ -287,7 +287,9 @@ ClassFlow* ClassFlowControll::CreateClassFlow(std::string _type)
     #endif //ENABLE_WEBHOOK
 
     if (toUpper(_type).compare("[SHT3X]") == 0 || toUpper(_type).compare("[DS18B20]") == 0) {
-        cfc = new ClassFlowSensors(&FlowControll);
+        ClassFlowSensors* sensorFlow = new ClassFlowSensors(&FlowControll);
+        sensorFlow->setFlowControll(this);  // Pass controller reference for accessing AutoInterval
+        cfc = sensorFlow;
     }
 
     if (toUpper(_type).compare("[POSTPROCESSING]") == 0) {

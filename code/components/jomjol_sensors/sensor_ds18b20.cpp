@@ -27,6 +27,7 @@ static const char *TAG = "DS18B20";
 #define DS18B20_CMD_CONVERT_T       0x44
 #define DS18B20_CMD_READ_SCRATCHPAD 0xBE
 #define DS18B20_CMD_SEARCH_ROM      0xF0
+#define DS18B20_CMD_MATCH_ROM       0x55
 
 SensorDS18B20::SensorDS18B20(gpio_num_t gpio,
                              const std::string& mqttTopic,
@@ -140,6 +141,197 @@ static uint8_t ow_read_byte(gpio_num_t gpio)
     return byte;
 }
 
+uint8_t SensorDS18B20::calculateCRC8(const uint8_t* data, int len)
+{
+    uint8_t crc = 0;
+    for (int i = 0; i < len; i++) {
+        uint8_t inByte = data[i];
+        for (int j = 0; j < 8; j++) {
+            uint8_t mix = (crc ^ inByte) & 0x01;
+            crc >>= 1;
+            if (mix) {
+                crc ^= 0x8C;
+            }
+            inByte >>= 1;
+        }
+    }
+    return crc;
+}
+
+int SensorDS18B20::performRomSearch(std::vector<std::array<uint8_t, 8>>& romIds)
+{
+    romIds.clear();
+    
+    int lastDiscrepancy = 0;
+    int lastFamilyDiscrepancy = 0;
+    bool lastDeviceFlag = false;
+    std::array<uint8_t, 8> romBuffer = {0};  // Initialize to zeros
+    
+    // Keep searching until all devices are found
+    while (!lastDeviceFlag) {
+        int idBitNumber = 1;
+        int lastZero = 0;
+        int romByteNumber = 0;
+        uint8_t romByteMask = 1;
+        bool searchResult = false;
+        
+        // Reset the bus
+        if (!ow_reset(_gpio)) {
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "No devices found on 1-Wire bus during ROM search");
+            break;
+        }
+        
+        // Issue search command
+        ow_write_byte(_gpio, DS18B20_CMD_SEARCH_ROM);
+        
+        // Loop through all 64 bits of the ROM
+        do {
+            // Read a bit and its complement
+            int idBit = ow_read_bit(_gpio);
+            int cmpIdBit = ow_read_bit(_gpio);
+            
+            // Check for no devices or error
+            if (idBit && cmpIdBit) {
+                break;  // No devices responded
+            }
+            
+            int searchDirection;
+            
+            // If both bits are 0, there's a discrepancy
+            if (!idBit && !cmpIdBit) {
+                // If this discrepancy is before the last discrepancy
+                // on a previous Next, pick the same as last time
+                if (idBitNumber < lastDiscrepancy) {
+                    searchDirection = ((romBuffer[romByteNumber] & romByteMask) > 0);
+                } else {
+                    // If equal to last pick 1, if not pick 0
+                    searchDirection = (idBitNumber == lastDiscrepancy);
+                }
+                
+                // If 0 was picked, record its position
+                if (searchDirection == 0) {
+                    lastZero = idBitNumber;
+                    
+                    // Check for Last discrepancy in family
+                    if (lastZero < 9) {
+                        lastFamilyDiscrepancy = lastZero;
+                    }
+                }
+            } else {
+                // Bit write value for search
+                searchDirection = idBit;
+            }
+            
+            // Set or clear the bit in the ROM byte
+            if (searchDirection) {
+                romBuffer[romByteNumber] |= romByteMask;
+            } else {
+                romBuffer[romByteNumber] &= ~romByteMask;
+            }
+            
+            // Serial number search direction write bit
+            ow_write_bit(_gpio, searchDirection);
+            
+            // Increment bit counters
+            idBitNumber++;
+            romByteMask <<= 1;
+            
+            // If the mask is 0, go to new byte and reset mask
+            if (romByteMask == 0) {
+                romByteNumber++;
+                romByteMask = 1;
+            }
+            
+        } while (romByteNumber < 8);
+        
+        // If search was successful
+        if (idBitNumber >= 65) {
+            // Verify CRC
+            if (calculateCRC8(romBuffer.data(), 7) == romBuffer[7]) {
+                // Check if this is a DS18B20 (family code 0x28)
+                if (romBuffer[0] == 0x28) {
+                    romIds.push_back(romBuffer);
+                    searchResult = true;
+                } else {
+                    // Format family code as proper hex
+                    char familyCodeHex[8];
+                    snprintf(familyCodeHex, sizeof(familyCodeHex), "0x%02X", romBuffer[0]);
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Found non-DS18B20 device with family code: " + 
+                                        std::string(familyCodeHex));
+                }
+            } else {
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "CRC mismatch in ROM search");
+            }
+        }
+        
+        // Set search state for next iteration
+        lastDiscrepancy = lastZero;
+        
+        // Check if we're done
+        if (lastDiscrepancy == 0) {
+            lastDeviceFlag = true;
+        }
+    }
+    
+    return romIds.size();
+}
+
+bool SensorDS18B20::readSensorByRom(const std::array<uint8_t, 8>& romId, float& temp)
+{
+    // Reset and check presence
+    if (!ow_reset(_gpio)) {
+        return false;
+    }
+    
+    // Match ROM - address specific sensor
+    ow_write_byte(_gpio, DS18B20_CMD_MATCH_ROM);
+    
+    // Send the ROM ID
+    for (int i = 0; i < 8; i++) {
+        ow_write_byte(_gpio, romId[i]);
+    }
+    
+    // Start temperature conversion
+    ow_write_byte(_gpio, DS18B20_CMD_CONVERT_T);
+    
+    // Wait for conversion (750ms for 12-bit resolution)
+    vTaskDelay(pdMS_TO_TICKS(750));
+    
+    // Reset and check presence
+    if (!ow_reset(_gpio)) {
+        return false;
+    }
+    
+    // Match ROM again
+    ow_write_byte(_gpio, DS18B20_CMD_MATCH_ROM);
+    
+    // Send the ROM ID again
+    for (int i = 0; i < 8; i++) {
+        ow_write_byte(_gpio, romId[i]);
+    }
+    
+    // Read scratchpad
+    ow_write_byte(_gpio, DS18B20_CMD_READ_SCRATCHPAD);
+    
+    // Read 9 bytes
+    uint8_t data[9];
+    for (int i = 0; i < 9; i++) {
+        data[i] = ow_read_byte(_gpio);
+    }
+    
+    // Verify CRC
+    if (calculateCRC8(data, 8) != data[8]) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "CRC mismatch in DS18B20 data");
+        return false;
+    }
+    
+    // Convert temperature
+    int16_t rawTemp = (data[1] << 8) | data[0];
+    temp = (float)rawTemp / 16.0f;
+    
+    return true;
+}
+
 bool SensorDS18B20::init()
 {
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initializing DS18B20 sensor on GPIO" + 
@@ -159,25 +351,48 @@ bool SensorDS18B20::init()
     
     _initialized = true;
     
-    // Try to read one temperature to verify sensor works
-    float temp;
-    if (readOneSensor(temp)) {
-        _temperatures.clear();
-        _temperatures.push_back(temp);
-        
-        // Set timestamp for initial read
-        _lastRead = time(nullptr);
-        
-        // Store placeholder ROM ID (actual ROM search not implemented yet)
-        _romIds.clear();
-        std::array<uint8_t, 8> placeholderRom = {0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        _romIds.push_back(placeholderRom);
-        
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 sensor initialized successfully. Temp: " + 
-                            std::to_string(temp) + "°C");
-    } else {
-        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20 initialized but initial read failed");
+    // Perform ROM search to find all devices on the bus (ONE-TIME at startup)
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "=== DS18B20 ROM Search (startup only) ===");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Scanning 1-Wire bus for DS18B20 devices...");
+    int deviceCount = performRomSearch(_romIds);
+    
+    if (deviceCount == 0) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ROM search found no DS18B20 devices");
+        return false;
     }
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "ROM search complete: Found " + std::to_string(deviceCount) + " DS18B20 sensor(s)");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Discovered ROM IDs (will be used for all future reads):");
+    
+    // Log ROM IDs
+    for (size_t i = 0; i < _romIds.size(); i++) {
+        std::string romIdStr = getRomId(i);
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "  Sensor #" + std::to_string(i + 1) + ": " + romIdStr);
+    }
+    
+    // Read initial temperatures from all sensors
+    _temperatures.clear();
+    _temperatures.resize(_romIds.size(), 0.0f);
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Reading initial temperatures from discovered sensors...");
+    for (size_t i = 0; i < _romIds.size(); i++) {
+        float temp;
+        if (readSensorByRom(_romIds[i], temp)) {
+            _temperatures[i] = temp;
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "  Sensor #" + std::to_string(i + 1) + " initial temp: " + 
+                                std::to_string(temp) + "°C");
+        } else {
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "  Failed to read initial temperature from sensor #" + 
+                                std::to_string(i + 1));
+        }
+    }
+    
+    // Set timestamp for initial read
+    _lastRead = time(nullptr);
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "=== DS18B20 initialization complete ===");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Future reads will use these " + std::to_string(deviceCount) + 
+                        " cached sensor(s) without re-scanning");
     
     return true;
 }
@@ -215,21 +430,8 @@ bool SensorDS18B20::readOneSensor(float& temp)
         data[i] = ow_read_byte(_gpio);
     }
     
-    // Calculate CRC
-    uint8_t crc = 0;
-    for (int i = 0; i < 8; i++) {
-        uint8_t inByte = data[i];
-        for (int j = 0; j < 8; j++) {
-            uint8_t mix = (crc ^ inByte) & 0x01;
-            crc >>= 1;
-            if (mix) {
-                crc ^= 0x8C;
-            }
-            inByte >>= 1;
-        }
-    }
-    
-    if (crc != data[8]) {
+    // Verify CRC
+    if (calculateCRC8(data, 8) != data[8]) {
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "CRC mismatch in DS18B20 data");
         return false;
     }
@@ -247,28 +449,33 @@ bool SensorDS18B20::readData()
         return false;
     }
     
-    if (!shouldRead()) {
-        return false;
+    // Note: shouldRead() check is done by SensorManager::update() before calling this
+    // We don't check it again here to avoid breaking "follow flow" mode
+    
+    // Read temperatures from all previously discovered sensors
+    // Note: This does NOT perform ROM search - sensors were discovered once at startup
+    bool anySuccess = false;
+    
+    // Read all sensors
+    for (size_t i = 0; i < _romIds.size(); i++) {
+        float temp;
+        if (readSensorByRom(_romIds[i], temp)) {
+            _temperatures[i] = temp;
+            anySuccess = true;
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensor #" + std::to_string(i + 1) + 
+                                " (" + getRomId(i) + "): " + std::to_string(temp) + "°C");
+        } else {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor #" + std::to_string(i + 1) + 
+                                " (" + getRomId(i) + ")");
+        }
     }
     
-    float temp;
-    if (!readOneSensor(temp)) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read DS18B20 sensor");
+    if (!anySuccess) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read any DS18B20 sensors");
         return false;
     }
-    
-    _temperatures.clear();
-    _temperatures.push_back(temp);
-    
-    // Store placeholder ROM ID (actual ROM search not implemented yet)
-    // When ROM search is implemented, this will be replaced with actual ROM IDs
-    _romIds.clear();
-    std::array<uint8_t, 8> placeholderRom = {0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    _romIds.push_back(placeholderRom);
     
     _lastRead = time(nullptr);
-    
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read: Temp=" + std::to_string(temp) + "°C");
     
     return true;
 }
@@ -305,9 +512,8 @@ std::string SensorDS18B20::getRomId(int index) const
 
 int SensorDS18B20::scanDevices()
 {
-    // Simple implementation: return count of detected sensors
-    // Future enhancement: implement full ROM search algorithm for multiple sensors
-    return _temperatures.size();
+    // Return the number of sensors found during ROM search
+    return _romIds.size();
 }
 
 void SensorDS18B20::publishMQTT()
@@ -319,15 +525,22 @@ void SensorDS18B20::publishMQTT()
     
     for (size_t i = 0; i < _temperatures.size(); i++) {
         std::string topic = _mqttTopic;
+        
+        // Include ROM ID in topic for sensor identification
+        std::string romIdStr = getRomId(i);
         if (_temperatures.size() > 1) {
-            topic += "/" + std::to_string(i);
+            // For multiple sensors, append ROM ID to topic
+            topic += "/" + romIdStr;
+        } else {
+            // For single sensor, optionally append ROM ID
+            topic += "/" + romIdStr;
         }
         
         std::string value = std::to_string(_temperatures[i]);
         MQTTPublish(topic, value, 1, true);
+        
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to MQTT: " + topic + " = " + value);
     }
-    
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to MQTT");
 #endif
 }
 
@@ -341,17 +554,17 @@ void SensorDS18B20::publishInfluxDB()
     time_t now = time(nullptr);
     
     for (size_t i = 0; i < _temperatures.size(); i++) {
-        std::string field = "temperature";
-        if (_temperatures.size() > 1) {
-            field += "_" + std::to_string(i);
-        }
+        // Include ROM ID in field name for sensor identification
+        std::string romIdStr = getRomId(i);
+        std::string field = "temperature_" + romIdStr;
         
         influxDB.InfluxDBPublish(_influxMeasurement, 
                                  field, 
                                  std::to_string(_temperatures[i]), 
                                  now);
+        
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to InfluxDB: " + field + " = " + 
+                            std::to_string(_temperatures[i]));
     }
-    
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to InfluxDB");
 #endif
 }

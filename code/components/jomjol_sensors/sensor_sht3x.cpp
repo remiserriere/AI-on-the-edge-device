@@ -160,9 +160,8 @@ bool SensorSHT3x::readData()
         return false;
     }
     
-    if (!shouldRead()) {
-        return false;
-    }
+    // Note: shouldRead() check is done by SensorManager::update() before calling this
+    // We don't check it again here to avoid breaking "follow flow" mode
     
     float temp, hum;
     if (!measureAndRead(temp, hum)) {

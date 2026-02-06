@@ -3309,8 +3309,11 @@ function EnDisableItem(_status, _param, _category, _cat, _name, _optional, _numb
         }
     }
 
-    document.getElementById(_cat+"_"+_name+"_text").disabled = !_status;
-    document.getElementById(_cat+"_"+_name+"_text").style.color = _color;
+    let textElement = document.getElementById(_cat+"_"+_name+"_text");
+    if (textElement) {
+        textElement.disabled = !_status;
+        textElement.style.color = _color;
+    }
 
     setEnabled(_cat+"_"+_name, _status);
 
@@ -3336,6 +3339,8 @@ function ReadParameter(_param, _cat, _name, _optional, _number = -1) {
 
         if (_optional) {
             NUMBERS[_number][_cat][_name]["enabled"] = document.getElementById(_cat+"_"+_name+"_enabled").checked;			
+        } else {
+            NUMBERS[_number][_cat][_name]["enabled"] = true;  // Non-optional parameters are always enabled
         }
 
         for (var j = 1; j <= _param[_cat][_name]["anzParam"]; ++j) {
@@ -3345,7 +3350,7 @@ function ReadParameter(_param, _cat, _name, _optional, _number = -1) {
                 NUMBERS[_number][_cat][_name]["value"+j] = element.selectedIndex > -1 ? element.options[element.selectedIndex].value : "";
             }
             else if ((element.getAttribute("type") != null) && (element.getAttribute("type").toLowerCase() == "checkbox")) {
-                NUMBERS[_number][_cat][_name]["value"+j] = element.checked;
+                NUMBERS[_number][_cat][_name]["value"+j] = element.checked ? "true" : "false";
             }
             else {
                 if ((NUMBERS[_number][_cat][_name].checkRegExList != null) && (NUMBERS[_number][_cat][_name].checkRegExList[j-1] != null)) {
@@ -3365,6 +3370,8 @@ function ReadParameter(_param, _cat, _name, _optional, _number = -1) {
     {
         if (_optional) {
             _param[_cat][_name]["enabled"] = document.getElementById(_cat+"_"+_name+"_enabled").checked;			
+        } else {
+            _param[_cat][_name]["enabled"] = true;  // Non-optional parameters are always enabled
         }
 
         for (var j = 1; j <= _param[_cat][_name]["anzParam"]; ++j) {
@@ -3374,7 +3381,7 @@ function ReadParameter(_param, _cat, _name, _optional, _number = -1) {
                 _param[_cat][_name]["value"+j] = element.selectedIndex > -1 ? element.options[element.selectedIndex].value : "";
             }
             else if ((element.getAttribute("type") != null) && (element.getAttribute("type").toLowerCase() == "checkbox")) {
-                _param[_cat][_name]["value"+j] = element.checked;
+                _param[_cat][_name]["value"+j] = element.checked ? "true" : "false";
             }
             else {
                 if ((_param[_cat][_name].checkRegExList != null) && (_param[_cat][_name].checkRegExList[j-1] != null)) {
@@ -3415,7 +3422,10 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
             }		
         }
 	    
-        document.getElementById(_cat+"_"+_name+"_text").style.color = "black"
+        let textElement = document.getElementById(_cat+"_"+_name+"_text");
+        if (textElement) {
+            textElement.style.color = "black";
+        }
         setEnabled(_cat+"_"+_name, true);
 
         for (var j = 1; j <= anzpara; ++j) {
@@ -3462,7 +3472,10 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
             }		
         }
 		
-        document.getElementById(_cat+"_"+_name+"_text").style.color = "black"
+        let textElement = document.getElementById(_cat+"_"+_name+"_text");
+        if (textElement) {
+            textElement.style.color = "black";
+        }
         setEnabled(_cat+"_"+_name, true);
 
         for (var j = 1; j <= anzpara; ++j) {
@@ -3512,7 +3525,10 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
             }	
         }
 		
-        document.getElementById(_cat+"_"+_name+"_text").style="color: gray;"
+        let textElement = document.getElementById(_cat+"_"+_name+"_text");
+        if (textElement) {
+            textElement.style = "color: gray;";
+        }
         setEnabled(_cat+"_"+_name, false);
     }
 
