@@ -113,23 +113,44 @@ bool SensorSHT3x::measureAndRead(float& temp, float& hum)
         return false;
     }
     
-    // Wait for measurement (datasheet: max 15ms for high repeatability)
-    vTaskDelay(pdMS_TO_TICKS(20));
-    
-    // Read 6 bytes: temp MSB, temp LSB, temp CRC, hum MSB, hum LSB, hum CRC
+    // Poll for measurement completion instead of fixed delay
+    // Datasheet: max 15ms for high repeatability, add margin
+    const int maxWaitMs = 100;
+    const int pollIntervalMs = 5;
+    int elapsedMs = 0;
+    bool measurementComplete = false;
     uint8_t data[6];
-    cmdHandle = i2c_cmd_link_create();
-    i2c_master_start(cmdHandle);
-    i2c_master_write_byte(cmdHandle, (_i2cAddress << 1) | I2C_MASTER_READ, true);
-    i2c_master_read(cmdHandle, data, 5, I2C_MASTER_ACK);
-    i2c_master_read_byte(cmdHandle, &data[5], I2C_MASTER_NACK);
-    i2c_master_stop(cmdHandle);
     
-    ret = i2c_master_cmd_begin(_i2cPort, cmdHandle, pdMS_TO_TICKS(1000));
-    i2c_cmd_link_delete(cmdHandle);
+    while (elapsedMs < maxWaitMs) {
+        vTaskDelay(pdMS_TO_TICKS(pollIntervalMs));
+        elapsedMs += pollIntervalMs;
+        
+        // Try to read data - sensor will NACK if not ready
+        cmdHandle = i2c_cmd_link_create();
+        i2c_master_start(cmdHandle);
+        i2c_master_write_byte(cmdHandle, (_i2cAddress << 1) | I2C_MASTER_READ, true);
+        i2c_master_read(cmdHandle, data, 5, I2C_MASTER_ACK);
+        i2c_master_read_byte(cmdHandle, &data[5], I2C_MASTER_NACK);
+        i2c_master_stop(cmdHandle);
+        
+        ret = i2c_master_cmd_begin(_i2cPort, cmdHandle, pdMS_TO_TICKS(100));
+        i2c_cmd_link_delete(cmdHandle);
+        
+        if (ret == ESP_OK) {
+            measurementComplete = true;
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Measurement completed in " + std::to_string(elapsedMs) + "ms");
+            break;
+        }
+        
+        // If error is not a timeout/NACK, it's a real error
+        if (ret != ESP_ERR_TIMEOUT && ret != ESP_FAIL) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "I2C read error: " + std::to_string(ret));
+            return false;
+        }
+    }
     
-    if (ret != ESP_OK) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read measurement data: " + std::to_string(ret));
+    if (!measurementComplete) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Measurement timeout after " + std::to_string(maxWaitMs) + "ms");
         return false;
     }
     
@@ -163,18 +184,36 @@ bool SensorSHT3x::readData()
     // Note: shouldRead() check is done by SensorManager::update() before calling this
     // We don't check it again here to avoid breaking "follow flow" mode
     
+    // Retry logic for CRC failures
+    const int maxRetries = 3;
     float temp, hum;
-    if (!measureAndRead(temp, hum)) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor data");
-        return false;
+    bool success = false;
+    
+    for (int retry = 0; retry < maxRetries; retry++) {
+        if (measureAndRead(temp, hum)) {
+            _temperature = temp;
+            _humidity = hum;
+            _lastRead = time(nullptr);
+            success = true;
+            
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read: Temp=" + std::to_string(_temperature) + 
+                                "°C, Humidity=" + std::to_string(_humidity) + "%");
+            break;
+        } else {
+            if (retry < maxRetries - 1) {
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Read failed, retry " + std::to_string(retry + 1) + 
+                                    "/" + std::to_string(maxRetries - 1));
+                // Small delay before retry
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
+        }
     }
     
-    _temperature = temp;
-    _humidity = hum;
-    _lastRead = time(nullptr);
-    
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read: Temp=" + std::to_string(_temperature) + 
-                        "°C, Humidity=" + std::to_string(_humidity) + "%");
+    if (!success) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor data after " + 
+                            std::to_string(maxRetries) + " attempts");
+        return false;
+    }
     
     return true;
 }

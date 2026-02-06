@@ -294,8 +294,31 @@ bool SensorDS18B20::readSensorByRom(const std::array<uint8_t, 8>& romId, float& 
     // Start temperature conversion
     ow_write_byte(_gpio, DS18B20_CMD_CONVERT_T);
     
-    // Wait for conversion (750ms for 12-bit resolution)
-    vTaskDelay(pdMS_TO_TICKS(750));
+    // Poll for conversion completion instead of fixed delay
+    // During conversion, reading the bus returns 0 (busy) or 1 (ready)
+    // Maximum conversion time is 750ms for 12-bit resolution, add some margin
+    const int maxWaitMs = 1000;
+    const int pollIntervalMs = 10;
+    int elapsedMs = 0;
+    bool conversionComplete = false;
+    
+    while (elapsedMs < maxWaitMs) {
+        vTaskDelay(pdMS_TO_TICKS(pollIntervalMs));
+        elapsedMs += pollIntervalMs;
+        
+        // Read a bit to check conversion status
+        // DS18B20 pulls line low during conversion, releases when done
+        if (ow_read(_gpio)) {
+            conversionComplete = true;
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Conversion completed in " + std::to_string(elapsedMs) + "ms");
+            break;
+        }
+    }
+    
+    if (!conversionComplete) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Conversion timeout after " + std::to_string(maxWaitMs) + "ms");
+        // Continue anyway, data might still be valid
+    }
     
     // Reset and check presence
     if (!ow_reset(_gpio)) {
@@ -410,8 +433,31 @@ bool SensorDS18B20::readOneSensor(float& temp)
     // Start temperature conversion
     ow_write_byte(_gpio, DS18B20_CMD_CONVERT_T);
     
-    // Wait for conversion (750ms for 12-bit resolution)
-    vTaskDelay(pdMS_TO_TICKS(750));
+    // Poll for conversion completion instead of fixed delay
+    // During conversion, reading the bus returns 0 (busy) or 1 (ready)
+    // Maximum conversion time is 750ms for 12-bit resolution, add some margin
+    const int maxWaitMs = 1000;
+    const int pollIntervalMs = 10;
+    int elapsedMs = 0;
+    bool conversionComplete = false;
+    
+    while (elapsedMs < maxWaitMs) {
+        vTaskDelay(pdMS_TO_TICKS(pollIntervalMs));
+        elapsedMs += pollIntervalMs;
+        
+        // Read a bit to check conversion status
+        // DS18B20 pulls line low during conversion, releases when done
+        if (ow_read(_gpio)) {
+            conversionComplete = true;
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Conversion completed in " + std::to_string(elapsedMs) + "ms");
+            break;
+        }
+    }
+    
+    if (!conversionComplete) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Conversion timeout after " + std::to_string(maxWaitMs) + "ms");
+        // Continue anyway, data might still be valid
+    }
     
     // Reset and check presence
     if (!ow_reset(_gpio)) {
@@ -456,17 +502,34 @@ bool SensorDS18B20::readData()
     // Note: This does NOT perform ROM search - sensors were discovered once at startup
     bool anySuccess = false;
     
-    // Read all sensors
+    // Read all sensors with retry logic for CRC failures
+    const int maxRetries = 3;
     for (size_t i = 0; i < _romIds.size(); i++) {
         float temp;
-        if (readSensorByRom(_romIds[i], temp)) {
-            _temperatures[i] = temp;
-            anySuccess = true;
-            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensor #" + std::to_string(i + 1) + 
-                                " (" + getRomId(i) + "): " + std::to_string(temp) + "°C");
-        } else {
+        bool success = false;
+        
+        // Retry up to maxRetries times on failure
+        for (int retry = 0; retry < maxRetries; retry++) {
+            if (readSensorByRom(_romIds[i], temp)) {
+                _temperatures[i] = temp;
+                anySuccess = true;
+                success = true;
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensor #" + std::to_string(i + 1) + 
+                                    " (" + getRomId(i) + "): " + std::to_string(temp) + "°C");
+                break;
+            } else {
+                if (retry < maxRetries - 1) {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Read failed for sensor #" + std::to_string(i + 1) + 
+                                        ", retry " + std::to_string(retry + 1) + "/" + std::to_string(maxRetries - 1));
+                    // Small delay before retry
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                }
+            }
+        }
+        
+        if (!success) {
             LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor #" + std::to_string(i + 1) + 
-                                " (" + getRomId(i) + ")");
+                                " (" + getRomId(i) + ") after " + std::to_string(maxRetries) + " attempts");
         }
     }
     
