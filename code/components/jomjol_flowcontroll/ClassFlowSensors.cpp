@@ -5,8 +5,16 @@
 #include "../../include/defines.h"
 
 #include <sstream>
+#include <cstdio>
 
 static const char *TAG = "FLOW_SENSORS";
+
+// Helper function to format float with 1 decimal place
+static std::string formatFloat(float value) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%.1f", value);
+    return std::string(buf);
+}
 
 ClassFlowSensors::ClassFlowSensors() : _initialized(false)
 {
@@ -109,7 +117,7 @@ bool ClassFlowSensors::doFlow(std::string time)
         float intervalMinutes = _flowController->getAutoInterval();
         flowIntervalSeconds = (int)(intervalMinutes * 60);  // Convert minutes to seconds
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Using flow interval: " + 
-                            std::to_string(intervalMinutes) + " min (" + 
+                            formatFloat(intervalMinutes) + " min (" + 
                             std::to_string(flowIntervalSeconds) + " sec)");
     } else {
         LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Flow controller not set, using default interval");

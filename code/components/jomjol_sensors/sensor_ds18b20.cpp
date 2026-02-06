@@ -22,6 +22,13 @@ extern InfluxDB influxDB;
 
 static const char *TAG = "DS18B20";
 
+// Helper function to format float with 1 decimal place
+static std::string formatTemp(float temp) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%.1f", temp);
+    return std::string(buf);
+}
+
 // DS18B20 commands
 #define DS18B20_CMD_SKIP_ROM        0xCC
 #define DS18B20_CMD_CONVERT_T       0x44
@@ -380,7 +387,7 @@ bool SensorDS18B20::init()
         if (readSensorByRom(_romIds[i], temp)) {
             _temperatures[i] = temp;
             LogFile.WriteToFile(ESP_LOG_INFO, TAG, "  Sensor #" + std::to_string(i + 1) + " initial temp: " + 
-                                std::to_string(temp) + "°C");
+                                formatTemp(temp) + "°C");
         } else {
             LogFile.WriteToFile(ESP_LOG_WARN, TAG, "  Failed to read initial temperature from sensor #" + 
                                 std::to_string(i + 1));
@@ -463,7 +470,7 @@ bool SensorDS18B20::readData()
             _temperatures[i] = temp;
             anySuccess = true;
             LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensor #" + std::to_string(i + 1) + 
-                                " (" + getRomId(i) + "): " + std::to_string(temp) + "°C");
+                                " (" + getRomId(i) + "): " + formatTemp(temp) + "°C");
         } else {
             LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor #" + std::to_string(i + 1) + 
                                 " (" + getRomId(i) + ")");
@@ -536,7 +543,7 @@ void SensorDS18B20::publishMQTT()
             topic += "/" + romIdStr;
         }
         
-        std::string value = std::to_string(_temperatures[i]);
+        std::string value = formatTemp(_temperatures[i]);
         MQTTPublish(topic, value, 1, true);
         
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to MQTT: " + topic + " = " + value);
@@ -560,11 +567,11 @@ void SensorDS18B20::publishInfluxDB()
         
         influxDB.InfluxDBPublish(_influxMeasurement, 
                                  field, 
-                                 std::to_string(_temperatures[i]), 
+                                 formatTemp(_temperatures[i]), 
                                  now);
         
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to InfluxDB: " + field + " = " + 
-                            std::to_string(_temperatures[i]));
+                            formatTemp(_temperatures[i]));
     }
 #endif
 }
