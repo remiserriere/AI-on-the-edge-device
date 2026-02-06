@@ -46,8 +46,8 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ./code/.pio/
-        key: build-${{ hashFiles('code/components/**/CMakeLists.txt', 'code/CMakeLists.txt', 'code/platformio.ini') }}-${{ github.run_id }}
-        restore-keys: build-${{ hashFiles('code/components/**/CMakeLists.txt', 'code/CMakeLists.txt', 'code/platformio.ini') }}- # Cache is invalidated when build config changes
+        key: build-${{ hashFiles('code/components/**/CMakeLists.txt', 'code/CMakeLists.txt', 'code/platformio.ini') }}
+        restore-keys: build- # Cache is invalidated when build config changes
 
     - name: Update generated-files cache on every commit
       uses: actions/cache@v4

@@ -47,8 +47,16 @@ public:
      */
     float getTemperature(int index = 0) const;
     
+    /**
+     * @brief Get ROM ID for specific sensor
+     * @param index Sensor index
+     * @return ROM ID as hex string (e.g., "28-0123456789AB")
+     */
+    std::string getRomId(int index = 0) const;
+    
 private:
     std::vector<float> _temperatures;
+    std::vector<std::array<uint8_t, 8>> _romIds; // Store ROM IDs for each sensor
     gpio_num_t _gpio;
     bool _initialized;
     

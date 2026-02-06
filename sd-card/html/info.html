@@ -562,6 +562,18 @@ Copyright &copy; 2020 - 2024 by <a href="https://github.com/jomjol/AI-on-the-edg
 									var row = table.insertRow(-1);
 									row.innerHTML = '<td>DS18B20 Temperature:</td><td><output>' + tempStr + '</output></td>';
 									
+									// Display ROM IDs if available (for chainable sensors)
+									if (sensor.rom_ids && sensor.rom_ids.length > 0) {
+										for (var i = 0; i < sensor.rom_ids.length; i++) {
+											row = table.insertRow(-1);
+											var label = sensor.count > 1 ? 'DS18B20 #' + (i + 1) + ' Address:' : 'DS18B20 Address:';
+											var romId = sensor.rom_ids[i];
+											// Add note if it's a placeholder (all zeros except family code)
+											var note = romId === '28-000000000000' ? ' (ROM search not yet implemented)' : '';
+											row.innerHTML = '<td>' + label + '</td><td><output style="font-family: monospace;">' + romId + note + '</output></td>';
+										}
+									}
+									
 									row = table.insertRow(-1);
 									row.innerHTML = '<td>DS18B20 Last Read:</td><td><output>' + timeStr + '</output></td>';
 								}

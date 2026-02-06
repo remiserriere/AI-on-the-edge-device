@@ -305,10 +305,18 @@
 										html += '<span>🌡️ DS18B20: ';
 										if (sensor.count === 1) {
 											html += sensor.temperatures[0].toFixed(1) + sensor.unit;
+											// Show ROM ID if available and not placeholder
+											if (sensor.rom_ids && sensor.rom_ids[0] && sensor.rom_ids[0] !== '28-000000000000') {
+												html += ' [' + sensor.rom_ids[0] + ']';
+											}
 										} else {
 											sensor.temperatures.forEach(function(temp, idx) {
 												if (idx > 0) html += ', ';
 												html += temp.toFixed(1) + sensor.unit;
+												// Show ROM ID for each sensor if available
+												if (sensor.rom_ids && sensor.rom_ids[idx] && sensor.rom_ids[idx] !== '28-000000000000') {
+													html += ' [' + sensor.rom_ids[idx] + ']';
+												}
 											});
 										}
 										html += '</span>';
