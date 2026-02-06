@@ -49,16 +49,6 @@ jobs:
         key: build-${{ hashFiles('code/components/**/CMakeLists.txt', 'code/CMakeLists.txt', 'code/platformio.ini') }}
         restore-keys: build- # Cache is invalidated when build config changes
 
-    - name: Update generated-files cache on every commit
-      uses: actions/cache@v4
-      with:
-        path: |
-          ./code/.pio/build/esp32cam/firmware.bin
-          ./code/.pio/build/esp32cam/partitions.bin
-          ./code/.pio/build/esp32cam/bootloader.bin
-        key: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}-${{ github.run_id }}
-        restore-keys: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}- # Cache invalidated on source or HTML changes          
-
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -106,6 +96,30 @@ jobs:
         mkdir demo
         cp -r ./sd-card/demo/* ./demo/
 
+    - name: Upload firmware artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: firmware-binaries
+        path: |
+          ./code/.pio/build/esp32cam/firmware.bin
+          ./code/.pio/build/esp32cam/partitions.bin
+          ./code/.pio/build/esp32cam/bootloader.bin
+        retention-days: 1
+        
+    - name: Upload web UI artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: web-ui
+        path: ./html/
+        retention-days: 1
+        
+    - name: Upload demo artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: demo-files
+        path: ./demo/
+        retention-days: 1
+
 #########################################################################################
 ## Pack for Update
 #########################################################################################
@@ -122,17 +136,23 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Update generated-files cache on every commit
-      uses: actions/cache@v4
+    - name: Download firmware artifacts
+      uses: actions/download-artifact@v4
       with:
-        path: |
-          ./code/.pio/build/esp32cam/firmware.bin
-          ./code/.pio/build/esp32cam/partitions.bin
-          ./code/.pio/build/esp32cam/bootloader.bin
-          ./html/*
-          ./demo/*
-        key: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}-${{ github.run_id }}
-        restore-keys: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}- # Cache invalidated on source or HTML changes
+        name: firmware-binaries
+        path: ./code/.pio/build/esp32cam/
+        
+    - name: Download web UI artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: web-ui
+        path: ./html/
+        
+    - name: Download demo artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: demo-files
+        path: ./demo/
 
     - name: Update update cache on every commit
       uses: actions/cache@v4
@@ -189,17 +209,23 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Update generated-files cache on every commit
-      uses: actions/cache@v4
+    - name: Download firmware artifacts
+      uses: actions/download-artifact@v4
       with:
-        path: |
-          ./code/.pio/build/esp32cam/firmware.bin
-          ./code/.pio/build/esp32cam/partitions.bin
-          ./code/.pio/build/esp32cam/bootloader.bin
-          ./html/*
-          ./demo/*
-        key: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}-${{ github.run_id }}
-        restore-keys: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}- # Cache invalidated on source or HTML changes
+        name: firmware-binaries
+        path: ./code/.pio/build/esp32cam/
+        
+    - name: Download web UI artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: web-ui
+        path: ./html/
+        
+    - name: Download demo artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: demo-files
+        path: ./demo/
 
     - name: Update remote_setup cache on every commit
       uses: actions/cache@v4
@@ -249,17 +275,23 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Update generated-files cache on every commit
-      uses: actions/cache@v4
+    - name: Download firmware artifacts
+      uses: actions/download-artifact@v4
       with:
-        path: |
-          ./code/.pio/build/esp32cam/firmware.bin
-          ./code/.pio/build/esp32cam/partitions.bin
-          ./code/.pio/build/esp32cam/bootloader.bin
-          ./html/*
-          ./demo/*
-        key: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}-${{ github.run_id }}
-        restore-keys: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}- # Cache invalidated on source or HTML changes
+        name: firmware-binaries
+        path: ./code/.pio/build/esp32cam/
+        
+    - name: Download web UI artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: web-ui
+        path: ./html/
+        
+    - name: Download demo artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: demo-files
+        path: ./demo/
 
     - name: Update manual_setup cache on every commit
       uses: actions/cache@v4
