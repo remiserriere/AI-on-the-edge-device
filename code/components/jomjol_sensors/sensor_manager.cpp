@@ -450,6 +450,12 @@ std::string SensorManager::getJSON()
                     json << ds18b20->getTemperature(i);
                 }
                 json << "]";
+                json << ",\"rom_ids\":[";
+                for (int i = 0; i < count; i++) {
+                    if (i > 0) json << ",";
+                    json << "\"" << ds18b20->getRomId(i) << "\"";
+                }
+                json << "]";
                 json << ",\"unit\":\"°C\"";
             }
         }

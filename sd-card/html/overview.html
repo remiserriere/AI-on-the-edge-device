@@ -294,8 +294,13 @@
 								html = '<div style="margin-top: 5px; padding-top: 5px; border-top: 1px solid #ddd;"><strong>Sensors:</strong><br>';
 								
 								data.sensors.forEach(function(sensor) {
-									var timestamp = new Date(sensor.last_read * 1000);
-									var timeStr = timestamp.toLocaleString();
+									var timeStr = '';
+									if (sensor.last_read && sensor.last_read > 0) {
+										var timestamp = new Date(sensor.last_read * 1000);
+										timeStr = timestamp.toLocaleString();
+									} else {
+										timeStr = 'Not yet read';
+									}
 									
 									if (sensor.name === 'SHT3x') {
 										html += '<span style="display: inline-block; margin-right: 15px;">🌡️ ' + sensor.temperature.toFixed(1) + sensor.unit_temp + '</span>';
@@ -305,10 +310,18 @@
 										html += '<span>🌡️ DS18B20: ';
 										if (sensor.count === 1) {
 											html += sensor.temperatures[0].toFixed(1) + sensor.unit;
+											// Show ROM ID if available and not placeholder
+											if (sensor.rom_ids && sensor.rom_ids[0] && sensor.rom_ids[0] !== '28-00000000000000') {
+												html += ' [' + sensor.rom_ids[0] + ']';
+											}
 										} else {
 											sensor.temperatures.forEach(function(temp, idx) {
 												if (idx > 0) html += ', ';
 												html += temp.toFixed(1) + sensor.unit;
+												// Show ROM ID for each sensor if available
+												if (sensor.rom_ids && sensor.rom_ids[idx] && sensor.rom_ids[idx] !== '28-00000000000000') {
+													html += ' [' + sensor.rom_ids[idx] + ']';
+												}
 											});
 										}
 										html += '</span>';

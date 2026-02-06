@@ -1,6 +1,9 @@
 #include "sensor_ds18b20.h"
 #include "ClassLogFile.h"
 
+#include <array>
+#include <cstdio>
+
 #ifdef ENABLE_MQTT
 #include "interface_mqtt.h"
 #endif
@@ -161,6 +164,15 @@ bool SensorDS18B20::init()
     if (readOneSensor(temp)) {
         _temperatures.clear();
         _temperatures.push_back(temp);
+        
+        // Set timestamp for initial read
+        _lastRead = time(nullptr);
+        
+        // Store placeholder ROM ID (actual ROM search not implemented yet)
+        _romIds.clear();
+        std::array<uint8_t, 8> placeholderRom = {0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        _romIds.push_back(placeholderRom);
+        
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 sensor initialized successfully. Temp: " + 
                             std::to_string(temp) + "°C");
     } else {
@@ -247,6 +259,13 @@ bool SensorDS18B20::readData()
     
     _temperatures.clear();
     _temperatures.push_back(temp);
+    
+    // Store placeholder ROM ID (actual ROM search not implemented yet)
+    // When ROM search is implemented, this will be replaced with actual ROM IDs
+    _romIds.clear();
+    std::array<uint8_t, 8> placeholderRom = {0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    _romIds.push_back(placeholderRom);
+    
     _lastRead = time(nullptr);
     
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read: Temp=" + std::to_string(temp) + "°C");
@@ -265,6 +284,23 @@ float SensorDS18B20::getTemperature(int index) const
         return _temperatures[index];
     }
     return 0.0f;
+}
+
+std::string SensorDS18B20::getRomId(int index) const
+{
+    if (index >= 0 && index < (int)_romIds.size()) {
+        char buffer[32];
+        // Format as "28-XXXXXXXXXXXXXX" where 28 is the family code for DS18B20
+        // ROM format: [0]=family, [1-6]=serial, [7]=CRC
+        snprintf(buffer, sizeof(buffer), "%02X-%02X%02X%02X%02X%02X%02X%02X",
+                 _romIds[index][0],  // Family code (should be 0x28)
+                 _romIds[index][6], _romIds[index][5], _romIds[index][4],
+                 _romIds[index][3], _romIds[index][2], _romIds[index][1],
+                 _romIds[index][7]); // CRC byte
+        return std::string(buffer);
+    }
+    // Return placeholder format if ROM IDs not yet read
+    return "28-00000000000000";
 }
 
 int SensorDS18B20::scanDevices()
