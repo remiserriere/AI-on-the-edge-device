@@ -3323,8 +3323,11 @@ function EnDisableItem(_status, _param, _category, _cat, _name, _optional, _numb
         }
     }
 
-    document.getElementById(_cat+"_"+_name+"_text").disabled = !_status;
-    document.getElementById(_cat+"_"+_name+"_text").style.color = _color;
+    let textElement = document.getElementById(_cat+"_"+_name+"_text");
+    if (textElement) {
+        textElement.disabled = !_status;
+        textElement.style.color = _color;
+    }
 
     setEnabled(_cat+"_"+_name, _status);
 
@@ -3532,7 +3535,10 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
             }	
         }
 		
-        document.getElementById(_cat+"_"+_name+"_text").style="color: gray;"
+        let textElement = document.getElementById(_cat+"_"+_name+"_text");
+        if (textElement) {
+            textElement.style = "color: gray;";
+        }
         setEnabled(_cat+"_"+_name, false);
     }
 
