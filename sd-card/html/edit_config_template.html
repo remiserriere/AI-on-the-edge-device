@@ -3339,6 +3339,8 @@ function ReadParameter(_param, _cat, _name, _optional, _number = -1) {
 
         if (_optional) {
             NUMBERS[_number][_cat][_name]["enabled"] = document.getElementById(_cat+"_"+_name+"_enabled").checked;			
+        } else {
+            NUMBERS[_number][_cat][_name]["enabled"] = true;  // Non-optional parameters are always enabled
         }
 
         for (var j = 1; j <= _param[_cat][_name]["anzParam"]; ++j) {
@@ -3368,6 +3370,8 @@ function ReadParameter(_param, _cat, _name, _optional, _number = -1) {
     {
         if (_optional) {
             _param[_cat][_name]["enabled"] = document.getElementById(_cat+"_"+_name+"_enabled").checked;			
+        } else {
+            _param[_cat][_name]["enabled"] = true;  // Non-optional parameters are always enabled
         }
 
         for (var j = 1; j <= _param[_cat][_name]["anzParam"]; ++j) {
