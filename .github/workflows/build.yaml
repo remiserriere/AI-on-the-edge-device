@@ -46,8 +46,8 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ./code/.pio/
-        key: build-${{ github.run_id }}
-        restore-keys: build # This matches above key as it is only used as a prefix. it the restores the nearest cache, see https://github.com/restore-keys:/blob/main/tips-and-workarounds.md#update-a-cache
+        key: build-${{ hashFiles('code/components/**/CMakeLists.txt', 'code/CMakeLists.txt', 'code/platformio.ini') }}-${{ github.run_id }}
+        restore-keys: build-${{ hashFiles('code/components/**/CMakeLists.txt', 'code/CMakeLists.txt', 'code/platformio.ini') }}- # Cache is invalidated when build config changes
 
     - name: Update generated-files cache on every commit
       uses: actions/cache@v4
@@ -56,10 +56,8 @@ jobs:
           ./code/.pio/build/esp32cam/firmware.bin
           ./code/.pio/build/esp32cam/partitions.bin
           ./code/.pio/build/esp32cam/bootloader.bin
-          ./html/*
-          ./demo/*
-        key: generated-files-${{ github.run_id }}
-        restore-keys: generated-files # This matches above key as it is only used as a prefix. it the restores the nearest cache, see https://github.com/restore-keys:/blob/main/tips-and-workarounds.md#update-a-cache          
+        key: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}-${{ github.run_id }}
+        restore-keys: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}- # Cache invalidated on source or HTML changes          
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -133,8 +131,8 @@ jobs:
           ./code/.pio/build/esp32cam/bootloader.bin
           ./html/*
           ./demo/*
-        key: generated-files-${{ github.run_id }}
-        restore-keys: generated-files # This matches above key as it is only used as a prefix. it the restores the nearest cache, see https://github.com/restore-keys:/blob/main/tips-and-workarounds.md#update-a-cache
+        key: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}-${{ github.run_id }}
+        restore-keys: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}- # Cache invalidated on source or HTML changes
 
     - name: Update update cache on every commit
       uses: actions/cache@v4
@@ -200,8 +198,8 @@ jobs:
           ./code/.pio/build/esp32cam/bootloader.bin
           ./html/*
           ./demo/*
-        key: generated-files-${{ github.run_id }}
-        restore-keys: generated-files # This matches above key as it is only used as a prefix. it the restores the nearest cache, see https://github.com/restore-keys:/blob/main/tips-and-workarounds.md#update-a-cache
+        key: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}-${{ github.run_id }}
+        restore-keys: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}- # Cache invalidated on source or HTML changes
 
     - name: Update remote_setup cache on every commit
       uses: actions/cache@v4
@@ -260,8 +258,8 @@ jobs:
           ./code/.pio/build/esp32cam/bootloader.bin
           ./html/*
           ./demo/*
-        key: generated-files-${{ github.run_id }}
-        restore-keys: generated-files # This matches above key as it is only used as a prefix. it the restores the nearest cache, see https://github.com/restore-keys:/blob/main/tips-and-workarounds.md#update-a-cache
+        key: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}-${{ github.run_id }}
+        restore-keys: generated-files-${{ hashFiles('code/**/*.cpp', 'code/**/*.h', 'code/**/*.c', 'sd-card/html/**/*') }}- # Cache invalidated on source or HTML changes
 
     - name: Update manual_setup cache on every commit
       uses: actions/cache@v4
