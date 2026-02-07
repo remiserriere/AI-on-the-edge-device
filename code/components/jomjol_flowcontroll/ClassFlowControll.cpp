@@ -221,6 +221,7 @@ void ClassFlowControll::SetInitialParameter(void)
     flowdigit = NULL;
     flowanalog = NULL;
     flowpostprocessing = NULL;
+    flowsensors = NULL;
     disabled = false;
     aktRunNr = 0;
     aktstatus = "Flow task not yet created";
@@ -287,9 +288,13 @@ ClassFlow* ClassFlowControll::CreateClassFlow(std::string _type)
     #endif //ENABLE_WEBHOOK
 
     if (toUpper(_type).compare("[SHT3X]") == 0 || toUpper(_type).compare("[DS18B20]") == 0) {
-        ClassFlowSensors* sensorFlow = new ClassFlowSensors(&FlowControll);
-        sensorFlow->setFlowControll(this);  // Pass controller reference for accessing AutoInterval
-        cfc = sensorFlow;
+        // Reuse existing sensor flow instance if it already exists
+        // This prevents duplicate sensor initialization when config has multiple sensor sections
+        if (!flowsensors) {
+            flowsensors = new ClassFlowSensors(&FlowControll);
+            flowsensors->setFlowControll(this);  // Pass controller reference for accessing AutoInterval
+        }
+        cfc = flowsensors;
     }
 
     if (toUpper(_type).compare("[POSTPROCESSING]") == 0) {
@@ -299,7 +304,17 @@ ClassFlow* ClassFlowControll::CreateClassFlow(std::string _type)
 
     if (cfc) {                           
         // Attached only if it is not [AutoTimer], because this is for FlowControll
-        FlowControll.push_back(cfc);
+        // Also check if this instance is already in the list (e.g., sensor flow reused for multiple sections)
+        bool alreadyInList = false;
+        for (const auto& flow : FlowControll) {
+            if (flow == cfc) {
+                alreadyInList = true;
+                break;
+            }
+        }
+        if (!alreadyInList) {
+            FlowControll.push_back(cfc);
+        }
     }
 
     if (toUpper(_type).compare("[AUTOTIMER]") == 0) {
