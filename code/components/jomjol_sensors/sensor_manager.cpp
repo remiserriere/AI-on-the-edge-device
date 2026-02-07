@@ -98,11 +98,10 @@ void SensorBase::sensorTask()
     const TickType_t xDelay = (_readInterval * 1000) / portTICK_PERIOD_MS;
     
     while (true) {
-        // Read sensor data and publish
-        if (readData()) {
-            publishMQTT();
-            publishInfluxDB();
-        }
+        // Read sensor data
+        // Note: readData() spawns an async task that handles publishing
+        // Don't publish here to avoid double-publishing
+        readData();
         
         vTaskDelay(xDelay);
     }
