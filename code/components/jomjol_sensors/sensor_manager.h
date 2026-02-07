@@ -105,6 +105,27 @@ private:
 /**
  * @brief Manager class for all sensors
  */
+/**
+ * @brief Sensor initialization status
+ */
+enum class SensorInitStatus {
+    NOT_INITIALIZED,
+    INITIALIZED,
+    FAILED_BUS_INIT,
+    FAILED_NO_DEVICE,
+    FAILED_OTHER
+};
+
+/**
+ * @brief Sensor error information
+ */
+struct SensorError {
+    std::string sensorName;
+    SensorInitStatus status;
+    std::string errorMessage;
+    int retryCount;
+};
+
 class SensorManager {
 public:
     SensorManager();
@@ -151,10 +172,26 @@ public:
      */
     const std::vector<std::unique_ptr<SensorBase>>& getSensors() const { return _sensors; }
     
+    /**
+     * @brief Get list of sensor errors
+     * @return Vector of sensor errors
+     */
+    const std::vector<SensorError>& getSensorErrors() const { return _sensorErrors; }
+    
+    /**
+     * @brief Check if there are any sensor errors
+     * @return true if errors exist
+     */
+    bool hasSensorErrors() const { return !_sensorErrors.empty(); }
+    
 private:
     std::vector<std::unique_ptr<SensorBase>> _sensors;
+    std::vector<SensorError> _sensorErrors;
     bool _enabled;
     bool _i2cInitialized;
+    
+    // TODO: Make retry count configurable via config file
+    static constexpr int SENSOR_INIT_RETRY_COUNT = 3;
     
     /**
      * @brief Initialize I2C bus
@@ -173,6 +210,16 @@ private:
      * @param onewirePin Output: 1-Wire pin number (-1 if not found)
      */
     void scanGPIOConfig(const std::string& configFile, int& sdaPin, int& sclPin, int& onewirePin);
+    
+    /**
+     * @brief Add a sensor error to the error list
+     * @param sensorName Name of the sensor
+     * @param status Initialization status
+     * @param errorMessage Detailed error message
+     * @param retryCount Number of retries attempted
+     */
+    void addSensorError(const std::string& sensorName, SensorInitStatus status, 
+                       const std::string& errorMessage, int retryCount);
 };
 
 #endif // SENSOR_MANAGER_H
