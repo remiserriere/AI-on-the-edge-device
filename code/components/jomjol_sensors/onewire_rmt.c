@@ -325,10 +325,14 @@ esp_err_t onewire_rmt_init(onewire_rmt_t* ow, gpio_num_t gpio)
     ow->initialized = false;
 
     // Find an available RMT channel
-    // ESP32 has 8 RMT channels (0-7), RMT_CHANNEL_MAX = 8 (count, not index)
-    // We'll try to use channel 4-7 to avoid conflicts with LED control (typically uses 0-3)
+    // Try to find a free channel, preferring higher-numbered channels
+    // to avoid conflicts with LED control (typically uses lower channels)
+    // Note: RMT_CHANNEL_MAX varies by ESP32 variant (4-8 channels)
     rmt_channel_t channel = RMT_CHANNEL_MAX;
-    for (int i = 4; i < RMT_CHANNEL_MAX; i++) {
+    int start_channel = (RMT_CHANNEL_MAX > 4) ? 4 : (RMT_CHANNEL_MAX / 2);
+    
+    // First try higher channels
+    for (int i = start_channel; i < RMT_CHANNEL_MAX; i++) {
         rmt_config_t config = {
             .rmt_mode = RMT_MODE_TX,
             .channel = (rmt_channel_t)i,
@@ -350,6 +354,35 @@ esp_err_t onewire_rmt_init(onewire_rmt_t* ow, gpio_num_t gpio)
             if (ret == ESP_OK) {
                 channel = (rmt_channel_t)i;
                 break;
+            }
+        }
+    }
+    
+    // If no higher channel found, try lower channels as fallback
+    if (channel == RMT_CHANNEL_MAX) {
+        for (int i = 0; i < start_channel; i++) {
+            rmt_config_t config = {
+                .rmt_mode = RMT_MODE_TX,
+                .channel = (rmt_channel_t)i,
+                .gpio_num = gpio,
+                .clk_div = OW_RMT_CLK_DIV,
+                .mem_block_num = OW_RMT_MEM_BLOCK_NUM,
+                .flags = 0,
+                .tx_config = {
+                    .carrier_en = false,
+                    .loop_en = false,
+                    .idle_output_en = true,
+                    .idle_level = RMT_IDLE_LEVEL_HIGH,
+                }
+            };
+
+            esp_err_t ret = rmt_config(&config);
+            if (ret == ESP_OK) {
+                ret = rmt_driver_install(config.channel, 0, 0);
+                if (ret == ESP_OK) {
+                    channel = (rmt_channel_t)i;
+                    break;
+                }
             }
         }
     }
