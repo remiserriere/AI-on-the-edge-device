@@ -406,17 +406,6 @@ bool SensorManager::initFromConfig(const std::string& configFile, const std::map
     
     return true;  // Always return true to allow device to continue booting
 }
-            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "All configured sensors failed to initialize");
-        }
-    } else if (anyFailure) {
-        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Some sensors failed to start periodic tasks");
-    } else {
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "All sensors started successfully");
-    }
-    
-    // Always return true to allow device to boot even with sensor errors
-    return true;
-}
 
 void SensorManager::update(int flowInterval)
 {
