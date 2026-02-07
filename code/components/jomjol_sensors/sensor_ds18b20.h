@@ -4,7 +4,12 @@
 #define SENSOR_DS18B20_H
 
 #include "sensor_manager.h"
+#include "sensor_config.h"
 #include "driver/gpio.h"
+
+#if USE_ONEWIRE_RMT
+#include "onewire_rmt.h"
+#endif
 
 /**
  * @brief DS18B20 Temperature Sensor (1-Wire)
@@ -74,6 +79,10 @@ private:
     bool _initialized;
     TaskHandle_t _readTaskHandle;  // Handle for background read task
     bool _readSuccess;  // Result of background read
+    
+#if USE_ONEWIRE_RMT
+    onewire_rmt_t _ow_rmt;  // RMT-based 1-Wire driver handle
+#endif
     
     /**
      * @brief Background task that polls sensors until conversion complete

@@ -1,4 +1,5 @@
 #include "sensor_ds18b20.h"
+#include "sensor_config.h"
 #include "ClassLogFile.h"
 
 #include <array>
@@ -19,6 +20,10 @@ extern InfluxDB influxDB;
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "rom/ets_sys.h"
+
+#if USE_ONEWIRE_RMT
+#include "onewire_rmt.h"
+#endif
 
 static const char *TAG = "DS18B20";
 
@@ -43,6 +48,10 @@ SensorDS18B20::SensorDS18B20(gpio_num_t gpio,
     _mqttEnabled = mqttEnabled;
     _influxEnabled = influxEnabled;
     _lastRead = 0;
+    
+#if USE_ONEWIRE_RMT
+    memset(&_ow_rmt, 0, sizeof(_ow_rmt));
+#endif
 }
 
 SensorDS18B20::~SensorDS18B20()
@@ -54,11 +63,16 @@ SensorDS18B20::~SensorDS18B20()
     }
     
     if (_initialized) {
+#if USE_ONEWIRE_RMT
+        onewire_rmt_deinit(&_ow_rmt);
+#else
         gpio_reset_pin(_gpio);
+#endif
     }
 }
 
-// Simple 1-Wire bit-banging functions
+#if !USE_ONEWIRE_RMT
+// Software bit-banging 1-Wire functions
 static inline void ow_set_high(gpio_num_t gpio)
 {
     gpio_set_direction(gpio, GPIO_MODE_INPUT);  // High-Z (pulled up externally)
@@ -146,6 +160,7 @@ static uint8_t ow_read_byte(gpio_num_t gpio)
     }
     return byte;
 }
+#endif // !USE_ONEWIRE_RMT
 
 uint8_t SensorDS18B20::calculateCRC8(const uint8_t* data, int len)
 {
@@ -182,19 +197,32 @@ int SensorDS18B20::performRomSearch(std::vector<std::array<uint8_t, 8>>& romIds)
         bool searchResult = false;
         
         // Reset the bus
+#if USE_ONEWIRE_RMT
+        if (!onewire_rmt_reset(&_ow_rmt)) {
+#else
         if (!ow_reset(_gpio)) {
+#endif
             LogFile.WriteToFile(ESP_LOG_WARN, TAG, "No devices found on 1-Wire bus during ROM search");
             break;
         }
         
         // Issue search command
+#if USE_ONEWIRE_RMT
+        onewire_rmt_write_byte(&_ow_rmt, DS18B20_CMD_SEARCH_ROM);
+#else
         ow_write_byte(_gpio, DS18B20_CMD_SEARCH_ROM);
+#endif
         
         // Loop through all 64 bits of the ROM
         do {
             // Read a bit and its complement
+#if USE_ONEWIRE_RMT
+            int idBit = onewire_rmt_read_bit(&_ow_rmt);
+            int cmpIdBit = onewire_rmt_read_bit(&_ow_rmt);
+#else
             int idBit = ow_read_bit(_gpio);
             int cmpIdBit = ow_read_bit(_gpio);
+#endif
             
             // Check for no devices or error
             if (idBit && cmpIdBit) {
@@ -236,7 +264,11 @@ int SensorDS18B20::performRomSearch(std::vector<std::array<uint8_t, 8>>& romIds)
             }
             
             // Serial number search direction write bit
+#if USE_ONEWIRE_RMT
+            onewire_rmt_write_bit(&_ow_rmt, searchDirection);
+#else
             ow_write_bit(_gpio, searchDirection);
+#endif
             
             // Increment bit counters
             idBitNumber++;
@@ -289,12 +321,27 @@ bool SensorDS18B20::startConversion(size_t sensorIndex)
     }
     
     // Reset and check presence
+#if USE_ONEWIRE_RMT
+    if (!onewire_rmt_reset(&_ow_rmt)) {
+#else
     if (!ow_reset(_gpio)) {
+#endif
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "No presence pulse for sensor #" + std::to_string(sensorIndex + 1));
         return false;
     }
     
     // Match ROM - address specific sensor
+#if USE_ONEWIRE_RMT
+    onewire_rmt_write_byte(&_ow_rmt, DS18B20_CMD_MATCH_ROM);
+    
+    // Send the ROM ID
+    for (int i = 0; i < 8; i++) {
+        onewire_rmt_write_byte(&_ow_rmt, _romIds[sensorIndex][i]);
+    }
+    
+    // Start temperature conversion
+    onewire_rmt_write_byte(&_ow_rmt, DS18B20_CMD_CONVERT_T);
+#else
     ow_write_byte(_gpio, DS18B20_CMD_MATCH_ROM);
     
     // Send the ROM ID
@@ -304,6 +351,7 @@ bool SensorDS18B20::startConversion(size_t sensorIndex)
     
     // Start temperature conversion
     ow_write_byte(_gpio, DS18B20_CMD_CONVERT_T);
+#endif
     
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Started conversion for sensor #" + std::to_string(sensorIndex + 1));
     
@@ -318,7 +366,11 @@ bool SensorDS18B20::isConversionComplete(size_t sensorIndex)
     
     // Check if conversion is complete by reading the bus
     // DS18B20 pulls line low during conversion, releases when done
+#if USE_ONEWIRE_RMT
+    return onewire_rmt_read_bit(&_ow_rmt);
+#else
     return ow_read(_gpio);
+#endif
 }
 
 bool SensorDS18B20::readScratchpad(size_t sensorIndex)
@@ -328,7 +380,11 @@ bool SensorDS18B20::readScratchpad(size_t sensorIndex)
     }
     
     // Reset and check presence
+#if USE_ONEWIRE_RMT
+    if (!onewire_rmt_reset(&_ow_rmt)) {
+#else
     if (!ow_reset(_gpio)) {
+#endif
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "No presence pulse when reading sensor #" + std::to_string(sensorIndex + 1));
         return false;
     }
@@ -337,17 +393,35 @@ bool SensorDS18B20::readScratchpad(size_t sensorIndex)
     vTaskDelay(pdMS_TO_TICKS(1));
     
     // Match ROM again
+#if USE_ONEWIRE_RMT
+    onewire_rmt_write_byte(&_ow_rmt, DS18B20_CMD_MATCH_ROM);
+    
+    // Send the ROM ID again
+    for (int i = 0; i < 8; i++) {
+        onewire_rmt_write_byte(&_ow_rmt, _romIds[sensorIndex][i]);
+    }
+#else
     ow_write_byte(_gpio, DS18B20_CMD_MATCH_ROM);
     
     // Send the ROM ID again
     for (int i = 0; i < 8; i++) {
         ow_write_byte(_gpio, _romIds[sensorIndex][i]);
     }
+#endif
     
     // Small delay before read command for better reliability
     vTaskDelay(pdMS_TO_TICKS(1));
     
     // Read scratchpad
+#if USE_ONEWIRE_RMT
+    onewire_rmt_write_byte(&_ow_rmt, DS18B20_CMD_READ_SCRATCHPAD);
+    
+    // Read 9 bytes
+    uint8_t data[9];
+    for (int i = 0; i < 9; i++) {
+        data[i] = onewire_rmt_read_byte(&_ow_rmt);
+    }
+#else
     ow_write_byte(_gpio, DS18B20_CMD_READ_SCRATCHPAD);
     
     // Read 9 bytes
@@ -355,6 +429,7 @@ bool SensorDS18B20::readScratchpad(size_t sensorIndex)
     for (int i = 0; i < 9; i++) {
         data[i] = ow_read_byte(_gpio);
     }
+#endif
     
     // Verify CRC
     if (calculateCRC8(data, 8) != data[8]) {
@@ -382,7 +457,23 @@ bool SensorDS18B20::init()
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initializing DS18B20 sensor on GPIO" + 
                         std::to_string(_gpio));
     
-    // Configure GPIO
+#if USE_ONEWIRE_RMT
+    // Initialize RMT-based 1-Wire
+    esp_err_t err = onewire_rmt_init(&_ow_rmt, _gpio);
+    if (err != ESP_OK) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to initialize RMT 1-Wire driver on GPIO" + 
+                            std::to_string(_gpio));
+        return false;
+    }
+    
+    // Test communication
+    if (!onewire_rmt_reset(&_ow_rmt)) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "No DS18B20 device found on GPIO" + 
+                            std::to_string(_gpio));
+        return false;
+    }
+#else
+    // Configure GPIO for software bit-banging
     gpio_reset_pin(_gpio);
     gpio_set_pull_mode(_gpio, GPIO_PULLUP_ONLY);  // Enable pull-up
     ow_set_high(_gpio);
@@ -393,6 +484,7 @@ bool SensorDS18B20::init()
                             std::to_string(_gpio));
         return false;
     }
+#endif
     
     _initialized = true;
     
