@@ -93,12 +93,18 @@ bool ClassFlowSensors::doFlow(std::string time)
     
     // Initialize on first run
     if (!_initialized) {
-        if (!_sensorManager->init()) {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to initialize sensors");
-            return false;
-        }
+        // Always returns true now, even with errors, to allow device to boot
+        _sensorManager->init();
         _initialized = true;
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sensors initialized successfully");
+        
+        // Log initialization summary
+        if (_sensorManager->hasSensorErrors()) {
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Sensors initialized with errors - check logs for details");
+        } else if (_sensorManager->getSensors().empty()) {
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "No sensors configured");
+        } else {
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "All sensors initialized successfully");
+        }
     }
     
     // Get the flow interval from the controller for "follow flow" mode

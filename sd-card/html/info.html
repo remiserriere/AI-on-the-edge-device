@@ -534,53 +534,63 @@ Copyright &copy; 2020 - 2024 by <a href="https://github.com/jomjol/AI-on-the-edg
 				if (this.status == 200) {
 					try {
 						var data = JSON.parse(xhttp.responseText);
-						if (data.sensors && data.sensors.length > 0) {
-							var table = document.getElementById('sensorTable');
+						var table = document.getElementById('sensorTable');
+						
+						// Show table if we have sensors or errors
+						if ((data.sensors && data.sensors.length > 0) || (data.errors && data.errors.length > 0)) {
 							table.style.display = 'table';
 							
-							data.sensors.forEach(function(sensor) {
-								var timeStr = '';
-								if (sensor.last_read && sensor.last_read > 0) {
-									var timestamp = new Date(sensor.last_read * 1000);
-									timeStr = timestamp.toLocaleString();
-								} else {
-									timeStr = 'Not yet read';
-								}
+							// Display errors first
+							if (data.errors && data.errors.length > 0) {
+								var row = table.insertRow(-1);
+								row.innerHTML = '<td colspan="2" style="background-color: #fff3cd; border: 1px solid #ffc107; padding: 8px;"><strong>⚠️ Sensor Errors</strong></td>';
 								
-								if (sensor.name === 'SHT3x') {
-									var row = table.insertRow(-1);
-									row.innerHTML = '<td>SHT3x Temperature:</td><td><output>' + sensor.temperature.toFixed(1) + ' ' + sensor.unit_temp + '</output></td>';
-									
-									row = table.insertRow(-1);
-									row.innerHTML = '<td>SHT3x Humidity:</td><td><output>' + sensor.humidity.toFixed(1) + ' ' + sensor.unit_humidity + '</output></td>';
-									
-									row = table.insertRow(-1);
-									row.innerHTML = '<td>SHT3x Last Read:</td><td><output>' + timeStr + '</output></td>';
-								} else if (sensor.name === 'DS18B20') {
-									var tempStr = '';
-									if (sensor.count === 1) {
-										tempStr = sensor.temperatures[0].toFixed(1) + ' ' + sensor.unit;
+								data.errors.forEach(function(error) {
+									var errorMsg = '';
+									if (error.status === 'bus_init_failed') {
+										errorMsg = error.name + ': Failed to initialize I2C bus';
+									} else if (error.status === 'no_device') {
+										errorMsg = error.name + ': Sensor not detected';
+									} else if (error.status === 'config_error') {
+										errorMsg = error.name + ': Configuration error';
 									} else {
-										tempStr = sensor.temperatures.map(function(t) { return t.toFixed(1); }).join(', ') + ' ' + sensor.unit + ' (' + sensor.count + ' sensors)';
-									}
-									
-									var row = table.insertRow(-1);
-									row.innerHTML = '<td>DS18B20 Temperature:</td><td><output>' + tempStr + '</output></td>';
-									
-									// Display ROM IDs if available (for chainable sensors)
-									if (sensor.rom_ids && sensor.rom_ids.length > 0) {
-										for (var i = 0; i < sensor.rom_ids.length; i++) {
-											row = table.insertRow(-1);
-											var label = sensor.count > 1 ? 'DS18B20 #' + (i + 1) + ' Address:' : 'DS18B20 Address:';
-											var romId = sensor.rom_ids[i];
-											row.innerHTML = '<td>' + label + '</td><td><output style="font-family: monospace;">' + romId + '</output></td>';
-										}
+										errorMsg = error.name + ': Unknown error';
 									}
 									
 									row = table.insertRow(-1);
-									row.innerHTML = '<td>DS18B20 Last Read:</td><td><output>' + timeStr + '</output></td>';
-								}
-							});
+									row.innerHTML = '<td style="padding-left: 20px;">' + errorMsg + ':</td><td><output>' + error.message + '</output></td>';
+								});
+							}
+							
+							// Display working sensors - each sensor is now its own object
+							if (data.sensors && data.sensors.length > 0) {
+								data.sensors.forEach(function(sensor) {
+									var timeStr = '';
+									if (sensor.last_read && sensor.last_read > 0) {
+										var timestamp = new Date(sensor.last_read * 1000);
+										timeStr = timestamp.toLocaleString();
+									} else {
+										timeStr = 'Not yet read';
+									}
+									
+									if (sensor.name === 'SHT3x') {
+										var row = table.insertRow(-1);
+										row.innerHTML = '<td>SHT3x Temperature:</td><td><output>' + sensor.temperature.toFixed(1) + ' ' + sensor.unit_temp + '</output></td>';
+										
+										row = table.insertRow(-1);
+										row.innerHTML = '<td>SHT3x Humidity:</td><td><output>' + sensor.humidity.toFixed(1) + ' ' + sensor.unit_humidity + '</output></td>';
+										
+										row = table.insertRow(-1);
+										row.innerHTML = '<td>SHT3x Last Read:</td><td><output>' + timeStr + '</output></td>';
+									} else if (sensor.name === 'DS18B20') {
+										var row = table.insertRow(-1);
+										row.innerHTML = '<td>DS18B20 ' + sensor.id + ':</td><td><output>' + sensor.temperature.toFixed(1) + ' ' + sensor.unit + '</output></td>';
+										
+										row = table.insertRow(-1);
+										row.innerHTML = '<td>DS18B20 Last Read:</td><td><output>' + timeStr + '</output></td>';
+									}
+								});
+							}
 						}
 					} catch (e) {
 						// Sensors not available, table stays hidden

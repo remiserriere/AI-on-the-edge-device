@@ -107,15 +107,17 @@ void SensorSHT3x::readTask()
             break;
         }
         
+        // Wait for measurement to complete before polling
+        // SHT3x high repeatability measurement takes ~15ms according to datasheet
+        vTaskDelay(pdMS_TO_TICKS(15));
+        
         // Poll for completion - yields to other tasks
-        // Timeout protection: max 100ms
+        // Timeout protection: max 100ms (should be done already, but just in case)
         bool measurementComplete = false;
         const int maxWaitMs = 100;
         const int pollIntervalMs = 5;
         
         for (int elapsed = 0; elapsed < maxWaitMs; elapsed += pollIntervalMs) {
-            vTaskDelay(pdMS_TO_TICKS(pollIntervalMs));
-            
             // Try to read data - sensor will NACK if not ready
             uint8_t data[6];
             cmdHandle = i2c_cmd_link_create();
@@ -131,7 +133,7 @@ void SensorSHT3x::readTask()
             if (ret == ESP_OK) {
                 // Data received - log completion time
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Measurement completed in ~" + 
-                                    std::to_string(elapsed + pollIntervalMs) + "ms");
+                                    std::to_string(15 + elapsed) + "ms");
                 
                 // Add settling delay after data ready to reduce CRC errors
                 vTaskDelay(pdMS_TO_TICKS(2));
@@ -170,7 +172,8 @@ void SensorSHT3x::readTask()
                 LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "I2C read error: " + std::to_string(ret));
                 break;
             }
-            // Otherwise sensor is still busy, continue polling
+            // Otherwise sensor is still busy, continue polling after delay
+            vTaskDelay(pdMS_TO_TICKS(pollIntervalMs));
         }
         
         if (success) {
@@ -254,6 +257,9 @@ bool SensorSHT3x::init()
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initializing SHT3x sensor at address 0x" + 
                         std::to_string(_i2cAddress));
     
+    // Small delay to ensure I2C bus is ready
+    vTaskDelay(pdMS_TO_TICKS(5));
+    
     // Try to communicate with the sensor - send soft reset
     uint8_t cmd[2];
     cmd[0] = (SHT3X_CMD_SOFT_RESET >> 8) & 0xFF;
@@ -273,7 +279,8 @@ bool SensorSHT3x::init()
         return false;
     }
     
-    vTaskDelay(pdMS_TO_TICKS(10));  // Wait for reset
+    // Wait longer for reset to complete and sensor to be ready
+    vTaskDelay(pdMS_TO_TICKS(20));
     
     _initialized = true;
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "SHT3x sensor initialized successfully");
