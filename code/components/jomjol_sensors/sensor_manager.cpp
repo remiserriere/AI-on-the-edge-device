@@ -16,6 +16,20 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+// Import SensorConfig from ClassFlowSensors.h
+struct SensorConfig {
+    bool enable = false;
+    int interval = -1;  // -1 = follow flow (default)
+    bool mqttEnable = true;
+    std::string mqttTopic;
+    bool influxEnable = false;
+    std::string influxMeasurement;
+    
+    // SHT3x specific
+    uint8_t sht3xAddress = 0x44;
+    uint32_t i2cFreq = 100000;
+};
+
 static const char *TAG = "SENSOR_MANAGER";
 
 // Helper function to safely parse integer without exceptions
@@ -199,6 +213,213 @@ bool SensorManager::init()
         if (_sensorErrors.empty()) {
             LogFile.WriteToFile(ESP_LOG_INFO, TAG, "No sensors configured");
         } else {
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "All configured sensors failed to initialize");
+        }
+    } else if (anyFailure) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Some sensors failed to start periodic tasks");
+    } else {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "All sensors started successfully");
+    }
+    
+    // Always return true to allow device to boot even with sensor errors
+    return true;
+}
+
+bool SensorManager::initFromConfig(const std::string& configFile, const std::map<std::string, SensorConfig>& sensorConfigs)
+{
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initializing sensors from parsed configuration");
+    
+    // First, scan GPIO configuration to find sensor pins
+    int sdaPin, sclPin, onewirePin;
+    scanGPIOConfig(configFile, sdaPin, sclPin, onewirePin);
+    
+    // Clear any previous sensor errors
+    _sensorErrors.clear();
+    
+    // Check if any sensor is enabled
+    bool anySensorEnabled = false;
+    for (const auto& pair : sensorConfigs) {
+        if (pair.second.enable) {
+            anySensorEnabled = true;
+            break;
+        }
+    }
+    
+    if (!anySensorEnabled) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "No sensors enabled in configuration");
+        _enabled = false;
+        return true;
+    }
+    
+    _enabled = true;
+    
+    // Initialize SHT3x sensor if configured
+    auto sht3xIt = sensorConfigs.find("SHT3x");
+    if (sht3xIt != sensorConfigs.end() && sht3xIt->second.enable) {
+        const SensorConfig& config = sht3xIt->second;
+        
+        if (sdaPin >= 0 && sclPin >= 0) {
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Attempting to initialize SHT3x sensor...");
+            
+            // Try to initialize I2C bus
+            bool i2cSuccess = false;
+            for (int retry = 0; retry < SENSOR_INIT_RETRY_COUNT; retry++) {
+                if (retry > 0) {
+                    int delayMs = 100 * retry;  // 100ms, 200ms
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "I2C init retry " + std::to_string(retry + 1) + 
+                                        " after " + std::to_string(delayMs) + "ms");
+                    vTaskDelay(pdMS_TO_TICKS(delayMs));
+                }
+                
+                if (initI2C(sdaPin, sclPin, config.i2cFreq)) {
+                    i2cSuccess = true;
+                    break;
+                }
+            }
+            
+            if (!i2cSuccess) {
+                addSensorError("SHT3x", SensorInitStatus::FAILED_BUS_INIT, 
+                              "Failed to initialize I2C bus after " + std::to_string(SENSOR_INIT_RETRY_COUNT) + " retries",
+                              SENSOR_INIT_RETRY_COUNT);
+                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "SHT3x initialization aborted - I2C bus init failed");
+                
+                // Add delay after I2C failure to allow GPIO states to settle before DS18B20 init
+                LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Waiting for GPIO states to stabilize after I2C failure...");
+                vTaskDelay(pdMS_TO_TICKS(200));
+            } else {
+                // I2C bus is ready, create and initialize sensor with retry
+                auto sensor = std::make_unique<SensorSHT3x>(
+                    config.sht3xAddress,
+                    config.mqttTopic,
+                    config.influxMeasurement,
+                    config.interval,
+                    config.mqttEnable,
+                    config.influxEnable
+                );
+                
+                std::stringstream ss;
+                ss << "0x" << std::hex << (int)config.sht3xAddress;
+                LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Created SHT3x sensor (addr:" + ss.str() + 
+                                    ", interval:" + (config.interval < 0 ? "follow flow" : std::to_string(config.interval) + "s") + ")");
+                
+                // Try to initialize the sensor with retries
+                bool initSuccess = false;
+                for (int retry = 0; retry < SENSOR_INIT_RETRY_COUNT; retry++) {
+                    if (retry > 0) {
+                        int delayMs = 100 * retry;  // 100ms, 200ms
+                        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "SHT3x sensor init retry " + std::to_string(retry + 1) + 
+                                            " after " + std::to_string(delayMs) + "ms");
+                        vTaskDelay(pdMS_TO_TICKS(delayMs));
+                    }
+                    
+                    if (sensor->init()) {
+                        initSuccess = true;
+                        break;
+                    }
+                }
+                
+                if (initSuccess) {
+                    _sensors.push_back(std::move(sensor));
+                    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "SHT3x sensor initialized successfully");
+                } else {
+                    addSensorError("SHT3x", SensorInitStatus::FAILED_NO_DEVICE,
+                                  "Sensor not responding at address " + ss.str() + " after " + 
+                                  std::to_string(SENSOR_INIT_RETRY_COUNT) + " retries",
+                                  SENSOR_INIT_RETRY_COUNT);
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "SHT3x sensor initialization failed");
+                }
+            }
+        } else {
+            addSensorError("SHT3x", SensorInitStatus::FAILED_OTHER,
+                          "I2C pins not configured in GPIO section",
+                          0);
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "SHT3x enabled but I2C pins not configured in GPIO section");
+        }
+    }
+    
+    // Initialize DS18B20 sensor if configured
+    auto ds18b20It = sensorConfigs.find("DS18B20");
+    if (ds18b20It != sensorConfigs.end() && ds18b20It->second.enable) {
+        const SensorConfig& config = ds18b20It->second;
+        
+        if (onewirePin >= 0) {
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Attempting to initialize DS18B20 sensor...");
+            
+            // Add initial delay to allow system boot to stabilize before 1-Wire init
+            vTaskDelay(pdMS_TO_TICKS(100));
+            
+            auto sensor = std::make_unique<SensorDS18B20>(
+                (gpio_num_t)onewirePin,
+                config.mqttTopic,
+                config.influxMeasurement,
+                config.interval,
+                config.mqttEnable,
+                config.influxEnable
+            );
+            
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Created DS18B20 sensor (GPIO:" + std::to_string(onewirePin) + 
+                                ", interval:" + (config.interval < 0 ? "follow flow" : std::to_string(config.interval) + "s") + ")");
+            
+            // Try to initialize the sensor with retries
+            bool initSuccess = false;
+            for (int retry = 0; retry < SENSOR_INIT_RETRY_COUNT; retry++) {
+                if (retry > 0) {
+                    // Longer delays: 200ms, 400ms (for retries 2 and 3)
+                    int delayMs = 200 * retry;
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20 sensor init retry " + std::to_string(retry + 1) + 
+                                        " after " + std::to_string(delayMs) + "ms");
+                    vTaskDelay(pdMS_TO_TICKS(delayMs));
+                }
+                
+                if (sensor->init()) {
+                    initSuccess = true;
+                    break;
+                }
+            }
+            
+            if (initSuccess) {
+                _sensors.push_back(std::move(sensor));
+                LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 sensor initialized successfully");
+            } else {
+                addSensorError("DS18B20", SensorInitStatus::FAILED_NO_DEVICE,
+                              "No DS18B20 devices found on GPIO" + std::to_string(onewirePin) + 
+                              " after " + std::to_string(SENSOR_INIT_RETRY_COUNT) + " retries",
+                              SENSOR_INIT_RETRY_COUNT);
+                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "DS18B20 sensor initialization failed");
+            }
+        } else {
+            addSensorError("DS18B20", SensorInitStatus::FAILED_OTHER,
+                          "1-Wire pin not configured in GPIO section",
+                          0);
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20 enabled but 1-Wire pin not configured in GPIO section");
+        }
+    }
+    
+    // Start periodic tasks for sensors with custom intervals
+    for (auto& sensor : _sensors) {
+        if (sensor->getReadInterval() > 0) {
+            if (!sensor->startPeriodicTask()) {
+                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to start periodic task for sensor: " + sensor->getName());
+            }
+        }
+    }
+    
+    // Log summary
+    if (_sensors.empty() && _sensorErrors.empty()) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "No sensors configured");
+    } else if (_sensors.empty() && !_sensorErrors.empty()) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "All sensors failed to initialize - device will continue to boot");
+    } else if (!_sensorErrors.empty()) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Some sensors failed to initialize - " + 
+                            std::to_string(_sensors.size()) + " sensor(s) working, " +
+                            std::to_string(_sensorErrors.size()) + " sensor(s) failed");
+    } else {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "All " + std::to_string(_sensors.size()) + 
+                            " sensor(s) initialized successfully");
+    }
+    
+    return true;  // Always return true to allow device to continue booting
+}
             LogFile.WriteToFile(ESP_LOG_WARN, TAG, "All configured sensors failed to initialize");
         }
     } else if (anyFailure) {

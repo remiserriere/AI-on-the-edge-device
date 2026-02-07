@@ -39,6 +39,7 @@ void ClassFlowSensors::SetInitialParameter(void)
     _sensorManager = nullptr;
     _flowController = nullptr;
     _initialized = false;
+    _configParsed = false;
 }
 
 bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
@@ -55,28 +56,84 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
     }
     
     std::string upperGraph = toUpper(aktparamgraph);
-    if (upperGraph.compare("[SHT3X]") != 0 && upperGraph.compare("[DS18B20]") != 0) {
+    std::string sensorType;
+    
+    if (upperGraph.compare("[SHT3X]") == 0) {
+        sensorType = "SHT3x";
+    } else if (upperGraph.compare("[DS18B20]") == 0) {
+        sensorType = "DS18B20";
+    } else {
         // Not a sensor section
         return false;
     }
     
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Found sensor section: " + aktparamgraph);
     
-    // Create sensor manager on first sensor section found
-    if (!_sensorManager) {
-        _sensorManager = std::make_unique<SensorManager>();
+    // Get or create configuration for this sensor type
+    SensorConfig& config = _sensorConfigs[sensorType];
+    
+    // Set default topics if not already set
+    if (config.mqttTopic.empty()) {
+        config.mqttTopic = (sensorType == "SHT3x") ? "sensors/sht3x" : "sensors/temperature";
+    }
+    if (config.influxMeasurement.empty()) {
+        config.influxMeasurement = "environment";
+    }
+    
+    // Parse parameters from the file
+    while (this->getNextLine(pfile, &aktparamgraph) && !this->isNewParagraph(aktparamgraph)) {
+        std::vector<std::string> splitted = ZerlegeZeile(aktparamgraph);
+        if (splitted.size() < 2) {
+            continue;
+        }
         
-        // Read configuration from file
-        if (!_sensorManager->readConfig(CONFIG_FILE)) {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read sensor configuration");
-            return false;
+        std::string param = toUpper(splitted[0]);
+        std::string value = splitted[1];
+        
+        if (param == "ENABLE") {
+            config.enable = (toUpper(value) == "TRUE" || value == "1");
+        } else if (param == "INTERVAL") {
+            try {
+                config.interval = std::stoi(value);
+            } catch (...) {
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, sensorType + ": Invalid interval value: " + value);
+            }
+        } else if (param == "MQTT_ENABLE") {
+            config.mqttEnable = (toUpper(value) == "TRUE" || value == "1");
+        } else if (param == "MQTT_TOPIC") {
+            config.mqttTopic = value;
+        } else if (param == "INFLUXDB_ENABLE") {
+            config.influxEnable = (toUpper(value) == "TRUE" || value == "1");
+        } else if (param == "INFLUXDB_MEASUREMENT") {
+            config.influxMeasurement = value;
+        } else if (sensorType == "SHT3x") {
+            // SHT3x-specific parameters
+            if (param == "ADDRESS") {
+                try {
+                    unsigned long tempAddress;
+                    // Support both hex (0x44) and decimal (68) formats
+                    if (value.find("0x") == 0 || value.find("0X") == 0) {
+                        tempAddress = std::stoul(value, nullptr, 16);
+                    } else {
+                        tempAddress = std::stoul(value, nullptr, 0);
+                    }
+                    if (tempAddress <= 0xFF) {
+                        config.sht3xAddress = static_cast<uint8_t>(tempAddress);
+                    }
+                } catch (...) {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "SHT3x: Invalid address value: " + value);
+                }
+            } else if (param == "I2C_FREQUENCY") {
+                try {
+                    config.i2cFreq = std::stoul(value);
+                } catch (...) {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "SHT3x: Invalid I2C frequency value: " + value);
+                }
+            }
         }
     }
     
-    // Skip to next paragraph
-    while (this->getNextLine(pfile, &aktparamgraph) && !this->isNewParagraph(aktparamgraph)) {
-        // Just consume lines until next paragraph
-    }
+    _configParsed = true;
     
     return true;
 }
@@ -87,14 +144,17 @@ bool ClassFlowSensors::doFlow(std::string time)
         return true;
     }
     
-    if (!_sensorManager || !_sensorManager->isEnabled()) {
-        return true;
-    }
-    
-    // Initialize on first run
-    if (!_initialized) {
-        // Always returns true now, even with errors, to allow device to boot
-        _sensorManager->init();
+    // Initialize on first run if we have configuration
+    if (!_initialized && _configParsed) {
+        // Create sensor manager
+        _sensorManager = std::make_unique<SensorManager>();
+        
+        // Pass the parsed configuration to the sensor manager
+        if (!_sensorManager->initFromConfig(CONFIG_FILE, _sensorConfigs)) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to initialize sensors");
+            // Still return true to allow device to continue booting
+        }
+        
         _initialized = true;
         
         // Log initialization summary
@@ -105,6 +165,10 @@ bool ClassFlowSensors::doFlow(std::string time)
         } else {
             LogFile.WriteToFile(ESP_LOG_INFO, TAG, "All sensors initialized successfully");
         }
+    }
+    
+    if (!_sensorManager || !_sensorManager->isEnabled()) {
+        return true;
     }
     
     // Get the flow interval from the controller for "follow flow" mode

@@ -6,9 +6,13 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <map>
 #include <time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
+// Forward declare SensorConfig to avoid circular dependency
+struct SensorConfig;
 
 /**
  * @brief Base class for all sensors
@@ -132,8 +136,17 @@ public:
     ~SensorManager();
     
     /**
+     * @brief Initialize sensor manager from parsed configuration
+     * @param configFile Path to config.ini file (for GPIO scanning)
+     * @param sensorConfigs Map of sensor type to configuration
+     * @return true if successful, false otherwise
+     */
+    bool initFromConfig(const std::string& configFile, const std::map<std::string, SensorConfig>& sensorConfigs);
+    
+    /**
      * @brief Initialize sensor manager and all configured sensors
      * @return true if successful, false otherwise
+     * @deprecated Use initFromConfig instead
      */
     bool init();
     
@@ -152,6 +165,7 @@ public:
      * @brief Read configuration and create sensor instances
      * @param configFile Path to config.ini file
      * @return true if successful, false otherwise
+     * @deprecated Use initFromConfig instead
      */
     bool readConfig(const std::string& configFile);
     
