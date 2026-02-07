@@ -2665,16 +2665,6 @@ function ReadParameterAll() {
     category["SHT3x"]["enabled"] = document.getElementById("Category_SHT3x_enabled").checked;
     category["DS18B20"]["enabled"] = document.getElementById("Category_DS18B20_enabled").checked;
 
-    // Auto-set Enable parameter for sensors based on category checkbox
-    if (param["SHT3x"] && param["SHT3x"]["Enable"]) {
-        param["SHT3x"]["Enable"]["enabled"] = true;
-        param["SHT3x"]["Enable"]["value1"] = category["SHT3x"]["enabled"] ? "true" : "false";
-    }
-    if (param["DS18B20"] && param["DS18B20"]["Enable"]) {
-        param["DS18B20"]["Enable"]["enabled"] = true;
-        param["DS18B20"]["Enable"]["value1"] = category["DS18B20"]["enabled"] ? "true" : "false";
-    }
-
     ReadParameter(param, "TakeImage", "RawImagesLocation", true);
     ReadParameter(param, "TakeImage", "RawImagesRetention", true);
     ReadParameter(param, "TakeImage", "WaitBeforeTakingPicture", false);
@@ -2808,17 +2798,6 @@ function ReadParameterAll() {
     ReadParameter(param, "DS18B20", "MQTT_Topic", false);
     ReadParameter(param, "DS18B20", "InfluxDB_Enable", false);
     ReadParameter(param, "DS18B20", "InfluxDB_Measurement", false);
-
-    // Update category checkbox state based on Enable parameter value (if found)
-    // This ensures the checkbox reflects the actual Enable parameter from config
-    function updateCategoryFromEnableParam(sensorName) {
-        if (param[sensorName] && param[sensorName]["Enable"] && param[sensorName]["Enable"]["found"]) {
-            var enableValue = param[sensorName]["Enable"]["value1"].toLowerCase();
-            category[sensorName]["enabled"] = (enableValue === "true");
-        }
-    }
-    updateCategoryFromEnableParam("SHT3x");
-    updateCategoryFromEnableParam("DS18B20");
 
     var sel = document.getElementById("Numbers_value1");
     UpdateInputIndividual(sel);

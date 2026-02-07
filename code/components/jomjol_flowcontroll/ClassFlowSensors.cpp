@@ -123,6 +123,9 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
     // Get or create configuration for this sensor type
     SensorConfig& config = _sensorConfigs[sensorType];
     
+    // Section found uncommented - enable the sensor (section comment/uncomment is the way to enable/disable)
+    config.enable = true;
+    
     // Set default topics if not already set
     if (config.mqttTopic.empty()) {
         config.mqttTopic = (sensorType == "SHT3x") ? "sensors/sht3x" : "sensors/temperature";
@@ -141,9 +144,7 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
         std::string param = toUpper(splitted[0]);
         std::string value = splitted[1];
         
-        if (param == "ENABLE") {
-            config.enable = (toUpper(value) == "TRUE" || value == "1");
-        } else if (param == "INTERVAL") {
+        if (param == "INTERVAL") {
             if (!safeParseInt(value, config.interval)) {
                 LogFile.WriteToFile(ESP_LOG_WARN, TAG, sensorType + ": Invalid interval value: " + value);
             }

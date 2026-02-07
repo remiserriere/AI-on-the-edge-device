@@ -160,14 +160,6 @@ public:
     void deinit();
     
     /**
-     * @brief Read configuration and create sensor instances
-     * @param configFile Path to config.ini file
-     * @return true if successful, false otherwise
-     * @deprecated Use initFromConfig instead
-     */
-    bool readConfig(const std::string& configFile);
-    
-    /**
      * @brief Check if sensor manager is enabled
      */
     bool isEnabled() { return _enabled; }
