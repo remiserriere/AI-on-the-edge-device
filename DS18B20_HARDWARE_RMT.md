@@ -45,9 +45,26 @@ The ESP32 (original/classic) has **8 RMT channels** available. Note that differe
 The implementation automatically selects an available channel, preferring higher-numbered channels (e.g., 4-7 on ESP32) to avoid conflicts with LED control which typically uses lower channels.
 
 ### GPIO Requirements
-- Any GPIO pin that supports RMT can be used for 1-Wire
-- Recommended pins for ESP32CAM: GPIO12, GPIO13 (compatible with other sensors)
-- Requires external 4.7kΩ pull-up resistor to 3.3V
+
+**RMT Peripheral GPIO Compatibility:**
+The ESP32 RMT peripheral can use **any GPIO pin** - there are no hardware restrictions. All of these pins work with RMT:
+- ✅ **GPIO1** - Works with RMT (⚠️ UART TX, requires disabling USB logging)
+- ✅ **GPIO3** - Works with RMT (⚠️ UART RX, requires disabling USB logging)
+- ✅ **GPIO12** - Works with RMT (✅ Recommended, no conflicts)
+- ✅ **GPIO13** - Works with RMT (✅ Recommended, no conflicts)
+
+**Recommended pins for ESP32CAM:** GPIO12, GPIO13
+- Fully available without conflicts
+- GPIO13 has built-in pull-up resistor
+
+**Alternative pins (with considerations):**
+- **GPIO1, GPIO3**: Work perfectly with RMT, but used for USB serial logging by default
+  - To use these pins: Disable USB logging in your configuration
+  - You'll lose serial console output via USB
+  - Better for production deployments where USB debugging isn't needed
+
+**Hardware Requirements:**
+- Requires external 4.7kΩ pull-up resistor to 3.3V on data line
 
 ### Wiring Diagram
 ```
@@ -150,6 +167,41 @@ The DS18B20 sensor class automatically uses the appropriate implementation based
 - ESP-IDF version is compatible (v4.0+ or v5.0+)
 - RMT driver is included in project configuration
 - All required headers are available
+
+### Issue: GPIO1 or GPIO3 not working
+**This is usually a USB logging conflict, not an RMT issue:**
+- GPIO1 (TX) and GPIO3 (RX) are UART pins used for USB serial communication
+- The RMT peripheral itself works fine on these pins
+- **Solution**: Disable USB serial logging in your configuration
+  - The sensor will work perfectly after disabling USB logging
+  - You'll lose serial console output, but the device will function normally
+- **Alternative**: Use GPIO12 or GPIO13 instead to keep USB logging
+
+## Frequently Asked Questions
+
+### Can I use GPIO1 or GPIO3 for DS18B20 with RMT?
+
+**Short answer: Yes, they work perfectly with the RMT driver.**
+
+**Long answer:** The ESP32 RMT peripheral has no restrictions on GPIO pin selection - it can use any GPIO pin including GPIO1 and GPIO3. However, these pins are also used for UART communication (USB serial logging):
+- **GPIO1**: UART TX (transmit)
+- **GPIO3**: UART RX (receive)
+
+If you use GPIO1 or GPIO3 for DS18B20:
+1. ✅ The RMT driver will work correctly
+2. ✅ Temperature readings will be accurate
+3. ✅ All DS18B20 features work (multi-sensor, ROM search, etc.)
+4. ❌ You'll lose USB serial console output
+
+**Recommendation:** Use GPIO12 or GPIO13 to avoid conflicts, unless you specifically don't need USB logging.
+
+### Does RMT work on all ESP32 GPIO pins?
+
+**Yes.** The RMT peripheral can use any GPIO pin without hardware restrictions. The limitations are based on what else is using those pins (UART, SD card, camera, etc.), not RMT capabilities.
+
+### What's the difference between software and RMT mode for GPIO compatibility?
+
+**No difference in GPIO compatibility.** Both modes can use the same GPIO pins. The RMT mode simply provides better timing precision and reliability, but doesn't change which pins you can use.
 
 ## Migration from Software to RMT
 
