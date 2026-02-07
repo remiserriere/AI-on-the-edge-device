@@ -28,7 +28,7 @@ extern "C" {
 typedef struct {
     gpio_num_t gpio;
     int rmt_channel;
-    void* rmt_handle;  // RMT channel handle (implementation-specific)
+    void* rmt_handle;  // Points to onewire_rmt_handle_v5_t for IDF v5.x, rmt_channel_t for v4.x
     bool initialized;
 } onewire_rmt_t;
 
