@@ -125,7 +125,6 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
     
     // Section found uncommented - enable the sensor (section comment/uncomment is the way to enable/disable)
     config.enable = true;
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, sensorType + " sensor enabled (uncommented section found)");
     
     // Set default topics if not already set
     if (config.mqttTopic.empty()) {
@@ -203,8 +202,6 @@ bool ClassFlowSensors::doFlow(std::string time)
     
     // Initialize on first run if we have configuration
     if (!_initialized && _configParsed) {
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initializing sensors with " + std::to_string(_sensorConfigs.size()) + " configured sensor type(s)");
-        
         // Create sensor manager
         _sensorManager = std::make_unique<SensorManager>();
         
