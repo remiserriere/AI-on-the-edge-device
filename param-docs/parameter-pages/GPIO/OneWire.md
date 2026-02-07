@@ -18,18 +18,20 @@ Configure a GPIO pin as `onewire` when you want to:
 
 ## Compatible GPIO Pins
 
-**All of these pins work with the RMT-based 1-Wire driver:**
+**Quick Answer: All four pins (GPIO1, GPIO3, GPIO12, GPIO13) work with RMT! ✅**
 
-| GPIO | Recommended | Notes |
-|------|-------------|-------|
-| **IO12** | ✅ **Yes** | Fully available (SD D2 unused in 1-bit mode), no conflicts |
-| **IO13** | ✅ **Yes** | Available with built-in pull-up, no conflicts |
-| **IO3** | ⚠️ Works but... | UART RX - requires disabling USB logging |
-| **IO1** | ⚠️ Works but... | UART TX - requires disabling USB logging |
+**All of these pins are fully compatible with the RMT-based 1-Wire driver:**
 
-**Technical Note:** The ESP32 RMT peripheral can use **any GPIO pin** without hardware restrictions. GPIO1 and GPIO3 work perfectly with RMT, but they're used for USB serial communication by default.
+| GPIO | RMT Works? | Recommended? | Notes |
+|------|------------|--------------|-------|
+| **IO1** | ✅ YES | ⚠️ Works but... | UART TX - requires disabling USB logging |
+| **IO3** | ✅ YES | ⚠️ Works but... | UART RX - requires disabling USB logging |
+| **IO12** | ✅ YES | ✅ **Yes** | Fully available (SD D2 unused in 1-bit mode), no conflicts |
+| **IO13** | ✅ YES | ✅ **Yes** | Available with built-in pull-up, no conflicts |
 
-**Recommended**: IO12 or IO13 for hassle-free operation
+**Technical Note:** The ESP32 RMT peripheral can use **any GPIO pin** without hardware restrictions. The RMT driver will work perfectly on all four pins. The only consideration is whether the pin is also used for other purposes (like UART/USB logging).
+
+**Recommended**: IO12 or IO13 for hassle-free operation with USB logging intact
 
 ### When to Use GPIO1 or GPIO3
 
