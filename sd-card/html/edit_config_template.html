@@ -2786,6 +2786,7 @@ function ReadParameterAll() {
     ReadParameter(param, "System", "CPUFrequency", true);
 
     // Sensor parameters
+    ReadParameter(param, "SHT3x", "Enable", false);
     ReadParameter(param, "SHT3x", "Address", false);
     ReadParameter(param, "SHT3x", "Interval", false);
     ReadParameter(param, "SHT3x", "I2C_Frequency", false);
@@ -2794,11 +2795,23 @@ function ReadParameterAll() {
     ReadParameter(param, "SHT3x", "InfluxDB_Enable", false);
     ReadParameter(param, "SHT3x", "InfluxDB_Measurement", false);
 
+    ReadParameter(param, "DS18B20", "Enable", false);
     ReadParameter(param, "DS18B20", "Interval", false);
     ReadParameter(param, "DS18B20", "MQTT_Enable", false);
     ReadParameter(param, "DS18B20", "MQTT_Topic", false);
     ReadParameter(param, "DS18B20", "InfluxDB_Enable", false);
     ReadParameter(param, "DS18B20", "InfluxDB_Measurement", false);
+
+    // Update category checkbox state based on Enable parameter value (if found)
+    // This ensures the checkbox reflects the actual Enable parameter from config
+    if (param["SHT3x"] && param["SHT3x"]["Enable"] && param["SHT3x"]["Enable"]["found"]) {
+        var enableValue = param["SHT3x"]["Enable"]["value1"].toLowerCase();
+        category["SHT3x"]["enabled"] = (enableValue === "true");
+    }
+    if (param["DS18B20"] && param["DS18B20"]["Enable"] && param["DS18B20"]["Enable"]["found"]) {
+        var enableValue = param["DS18B20"]["Enable"]["value1"].toLowerCase();
+        category["DS18B20"]["enabled"] = (enableValue === "true");
+    }
 
     var sel = document.getElementById("Numbers_value1");
     UpdateInputIndividual(sel);
