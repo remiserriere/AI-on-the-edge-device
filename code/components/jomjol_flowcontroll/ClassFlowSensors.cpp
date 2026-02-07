@@ -5,12 +5,59 @@
 #include "../../include/defines.h"
 
 #include <sstream>
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wexceptions"
-// Or use a compiler-specific flag if needed
+#include <cstdlib>
+#include <cerrno>
+#include <climits>
 
 static const char *TAG = "FLOW_SENSORS";
+
+// Helper function to safely parse integer without exceptions
+static bool safeParseInt(const std::string& str, int& result) {
+    if (str.empty()) {
+        return false;
+    }
+    
+    char* endptr = nullptr;
+    errno = 0;
+    long val = strtol(str.c_str(), &endptr, 10);
+    
+    // Check for errors
+    if (errno == ERANGE || val < INT_MIN || val > INT_MAX) {
+        return false;
+    }
+    
+    // Check if no conversion was performed
+    if (endptr == str.c_str() || *endptr != '\0') {
+        return false;
+    }
+    
+    result = static_cast<int>(val);
+    return true;
+}
+
+// Helper function to safely parse unsigned long without exceptions
+static bool safeParseULong(const std::string& str, unsigned long& result, int base = 10) {
+    if (str.empty()) {
+        return false;
+    }
+    
+    char* endptr = nullptr;
+    errno = 0;
+    unsigned long val = strtoul(str.c_str(), &endptr, base);
+    
+    // Check for errors
+    if (errno == ERANGE) {
+        return false;
+    }
+    
+    // Check if no conversion was performed
+    if (endptr == str.c_str() || *endptr != '\0') {
+        return false;
+    }
+    
+    result = val;
+    return true;
+}
 
 ClassFlowSensors::ClassFlowSensors() : _initialized(false)
 {
@@ -97,9 +144,7 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
         if (param == "ENABLE") {
             config.enable = (toUpper(value) == "TRUE" || value == "1");
         } else if (param == "INTERVAL") {
-            try {
-                config.interval = std::stoi(value);
-            } catch (...) {
+            if (!safeParseInt(value, config.interval)) {
                 LogFile.WriteToFile(ESP_LOG_WARN, TAG, sensorType + ": Invalid interval value: " + value);
             }
         } else if (param == "MQTT_ENABLE") {
@@ -113,24 +158,30 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
         } else if (sensorType == "SHT3x") {
             // SHT3x-specific parameters
             if (param == "ADDRESS") {
-                try {
-                    unsigned long tempAddress;
-                    // Support both hex (0x44) and decimal (68) formats
-                    if (value.find("0x") == 0 || value.find("0X") == 0) {
-                        tempAddress = std::stoul(value, nullptr, 16);
-                    } else {
-                        tempAddress = std::stoul(value, nullptr, 0);
-                    }
+                unsigned long tempAddress;
+                // Support both hex (0x44) and decimal (68) formats
+                int base = 0; // auto-detect base
+                if (value.find("0x") == 0 || value.find("0X") == 0) {
+                    base = 16;
+                }
+                if (safeParseULong(value, tempAddress, base)) {
                     if (tempAddress <= 0xFF) {
                         config.sht3xAddress = static_cast<uint8_t>(tempAddress);
+                    } else {
+                        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "SHT3x: Address out of range: " + value);
                     }
-                } catch (...) {
+                } else {
                     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "SHT3x: Invalid address value: " + value);
                 }
             } else if (param == "I2C_FREQUENCY") {
-                try {
-                    config.i2cFreq = std::stoul(value);
-                } catch (...) {
+                unsigned long tempFreq;
+                if (safeParseULong(value, tempFreq, 10)) {
+                    if (tempFreq <= UINT32_MAX) {
+                        config.i2cFreq = static_cast<uint32_t>(tempFreq);
+                    } else {
+                        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "SHT3x: I2C frequency out of range: " + value);
+                    }
+                } else {
                     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "SHT3x: Invalid I2C frequency value: " + value);
                 }
             }
