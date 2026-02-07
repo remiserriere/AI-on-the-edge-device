@@ -254,6 +254,9 @@ bool SensorSHT3x::init()
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initializing SHT3x sensor at address 0x" + 
                         std::to_string(_i2cAddress));
     
+    // Small delay to ensure I2C bus is ready
+    vTaskDelay(pdMS_TO_TICKS(5));
+    
     // Try to communicate with the sensor - send soft reset
     uint8_t cmd[2];
     cmd[0] = (SHT3X_CMD_SOFT_RESET >> 8) & 0xFF;
@@ -273,7 +276,8 @@ bool SensorSHT3x::init()
         return false;
     }
     
-    vTaskDelay(pdMS_TO_TICKS(10));  // Wait for reset
+    // Wait longer for reset to complete and sensor to be ready
+    vTaskDelay(pdMS_TO_TICKS(20));
     
     _initialized = true;
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "SHT3x sensor initialized successfully");

@@ -266,6 +266,7 @@ bool SensorManager::initI2C(int sda, int scl, uint32_t freq)
     esp_err_t err = i2c_driver_delete(I2C_NUM_0);
     if (err == ESP_OK) {
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Deleted existing I2C driver before reinit");
+        vTaskDelay(pdMS_TO_TICKS(10));  // Small delay after deletion
     }
     
     i2c_config_t conf = {};
@@ -294,6 +295,9 @@ bool SensorManager::initI2C(int sda, int scl, uint32_t freq)
         }
         return false;
     }
+    
+    // Give the I2C bus time to stabilize after initialization
+    vTaskDelay(pdMS_TO_TICKS(50));
     
     _i2cInitialized = true;
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "I2C initialized (SDA:" + std::to_string(sda) + 
