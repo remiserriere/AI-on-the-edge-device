@@ -16,7 +16,7 @@
  *   - Drawbacks: Timing affected by interrupts, more CRC errors (mitigated by retries)
  */
 #ifndef USE_ONEWIRE_RMT
-#define USE_ONEWIRE_RMT 1  // Default to software mode for stability (RMT under development)
+#define USE_ONEWIRE_RMT 0  // Default to software mode for stability (RMT under development)
 #endif
 
 /**
