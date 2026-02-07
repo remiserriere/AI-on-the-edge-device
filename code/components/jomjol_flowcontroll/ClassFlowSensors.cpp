@@ -194,13 +194,75 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
     return true;
 }
 
+void ClassFlowSensors::initializeEarly()
+{
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Starting early sensor initialization");
+    
+    // Check if we have parsed configuration
+    if (!_configParsed) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "No sensor configuration parsed - skipping early initialization");
+        return;
+    }
+    
+    // Check if already initialized
+    if (_initialized) {
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensors already initialized - skipping early initialization");
+        return;
+    }
+    
+    if (disabled) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sensors disabled - skipping early initialization");
+        return;
+    }
+    
+    // Create sensor manager
+    _sensorManager = std::make_unique<SensorManager>();
+    
+    // Pass the parsed configuration to the sensor manager
+    if (!_sensorManager->initFromConfig(CONFIG_FILE, _sensorConfigs)) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to initialize sensors during early init");
+        // Still mark as initialized to prevent double initialization
+        _initialized = true;
+        return;
+    }
+    
+    _initialized = true;
+    
+    // Log initialization summary
+    if (_sensorManager->hasSensorErrors()) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Sensors initialized with errors - check logs for details");
+    } else if (_sensorManager->getSensors().empty()) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "No sensors configured");
+    } else {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "All sensors initialized successfully during early init");
+    }
+    
+    // Perform first sensor reading if sensors are enabled
+    if (_sensorManager && _sensorManager->isEnabled()) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Performing first sensor reading");
+        
+        // Get flow interval (use 0 for immediate read on first call)
+        int flowIntervalSeconds = 0;
+        if (_flowController) {
+            float intervalMinutes = _flowController->getAutoInterval();
+            flowIntervalSeconds = (int)(intervalMinutes * 60);
+        }
+        
+        // Perform first update
+        _sensorManager->update(flowIntervalSeconds);
+        
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "First sensor reading completed");
+    }
+}
+
 bool ClassFlowSensors::doFlow(std::string time)
 {
     if (disabled) {
         return true;
     }
     
-    // Initialize on first run if we have configuration
+    // Initialize on first run if we have configuration and not yet initialized
+    // (This handles the case where initializeEarly wasn't called)
     if (!_initialized && _configParsed) {
         // Create sensor manager
         _sensorManager = std::make_unique<SensorManager>();
