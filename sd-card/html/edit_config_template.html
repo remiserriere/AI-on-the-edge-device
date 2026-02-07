@@ -1443,15 +1443,6 @@
             <td>$TOOLTIP_Webhook_UploadImg</td>
         </tr>
 
-
-        <!------------- SENSORS ------------------>
-        <tr style="border-bottom: 2px solid lightgray;">
-            <td colspan="3" style="padding-left: 0px; padding-bottom: 3px;">
-                <h4>External Sensors (Health & Safety Monitoring)</h4>
-                <p style="font-size: 0.9em; color: #666;">Monitor enclosure conditions to prevent device failure. Useful for outdoor installations.</p>
-            </td>
-        </tr>
-
         <!------------- SHT3x Sensor ------------------>
         <tr style="border-bottom: 2px solid lightgray;">
             <td colspan="3" style="padding-left: 0px; padding-bottom: 3px;">
@@ -1459,6 +1450,20 @@
                 <input type="checkbox" id="Category_SHT3x_enabled" value="1"  onclick = 'UpdateAfterCategoryCheck()' unchecked >
                 <label for=Category_SHT3x_enabled>SHT3x (Temperature & Humidity Sensor)</label>
                 </h4>
+                <div style="background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 10px; margin: 5px 0; font-size: 0.9em;">
+                    <strong>⚠️ GPIO Configuration Required:</strong> Before enabling this sensor, you must configure GPIO pins for I²C communication.
+                    <br><br>
+                    <strong>Steps:</strong>
+                    <ol style="margin: 5px 0; padding-left: 20px;">
+                        <li>Scroll down to the <strong>GPIO</strong> section below</li>
+                        <li>Click <strong>"Show Expert Parameters"</strong> checkbox to reveal GPIO settings</li>
+                        <li>Set one GPIO pin to <strong>i2c-sda</strong> (e.g., IO12)</li>
+                        <li>Set another GPIO pin to <strong>i2c-scl</strong> (e.g., IO13)</li>
+                        <li>Save configuration and restart device</li>
+                        <li>Then return here to enable and configure the SHT3x sensor</li>
+                    </ol>
+                    See <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/Sensors-Overview/" target="_blank">Sensors Overview Documentation</a> for detailed wiring and setup instructions.
+                </div>
             </td>
         </tr>
 
@@ -1529,7 +1534,20 @@
                 <input type="checkbox" id="Category_DS18B20_enabled" value="1"  onclick = 'UpdateAfterCategoryCheck()' unchecked >
                 <label for=Category_DS18B20_enabled>DS18B20 (Temperature Sensor - Chainable)</label>
                 </h4>
-                <p style="font-size: 0.9em; color: #666;">Multiple DS18B20 sensors can be chained on same wire. Each sensor is identified by unique ROM ID.</p>
+                <p style="font-size: 0.9em; color: #666; margin: 5px 0;">Multiple DS18B20 sensors can be chained on same wire. Each sensor is identified by unique ROM ID.</p>
+                <div style="background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 10px; margin: 5px 0; font-size: 0.9em;">
+                    <strong>⚠️ GPIO Configuration Required:</strong> Before enabling this sensor, you must configure GPIO pins for 1-Wire communication.
+                    <br><br>
+                    <strong>Steps:</strong>
+                    <ol style="margin: 5px 0; padding-left: 20px;">
+                        <li>Scroll down to the <strong>GPIO</strong> section below</li>
+                        <li>Click <strong>"Show Expert Parameters"</strong> checkbox to reveal GPIO settings</li>
+                        <li>Set one GPIO pin to <strong>onewire</strong> (e.g., IO12)</li>
+                        <li>Save configuration and restart device</li>
+                        <li>Then return here to enable and configure the DS18B20 sensor</li>
+                    </ol>
+                    See <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/Sensors-Overview/" target="_blank">Sensors Overview Documentation</a> for detailed wiring and setup instructions.
+                </div>
             </td>
         </tr>
 
@@ -2570,6 +2588,21 @@ function UpdateInput() {
     WriteParameter(param, category, "System", "RSSIThreshold", true);
     WriteParameter(param, category, "System", "CPUFrequency", true);
 
+    // Sensor parameters
+    WriteParameter(param, category, "SHT3x", "Address", false);
+    WriteParameter(param, category, "SHT3x", "Interval", false);
+    WriteParameter(param, category, "SHT3x", "I2C_Frequency", false);
+    WriteParameter(param, category, "SHT3x", "MQTT_Enable", false);
+    WriteParameter(param, category, "SHT3x", "MQTT_Topic", false);
+    WriteParameter(param, category, "SHT3x", "InfluxDB_Enable", false);
+    WriteParameter(param, category, "SHT3x", "InfluxDB_Measurement", false);
+
+    WriteParameter(param, category, "DS18B20", "Interval", false);
+    WriteParameter(param, category, "DS18B20", "MQTT_Enable", false);
+    WriteParameter(param, category, "DS18B20", "MQTT_Topic", false);
+    WriteParameter(param, category, "DS18B20", "InfluxDB_Enable", false);
+    WriteParameter(param, category, "DS18B20", "InfluxDB_Measurement", false);
+
     WriteModelFiles();
 }
 
@@ -2758,7 +2791,7 @@ function ReadParameterAll() {
     ReadParameter(param, "System", "RSSIThreshold", true);
     ReadParameter(param, "System", "CPUFrequency", true);
 
-    // Sensor parameters
+    // Sensor parameters (Note: Enable parameter is handled via category checkbox, not ReadParameter)
     ReadParameter(param, "SHT3x", "Address", false);
     ReadParameter(param, "SHT3x", "Interval", false);
     ReadParameter(param, "SHT3x", "I2C_Frequency", false);
@@ -2772,6 +2805,17 @@ function ReadParameterAll() {
     ReadParameter(param, "DS18B20", "MQTT_Topic", false);
     ReadParameter(param, "DS18B20", "InfluxDB_Enable", false);
     ReadParameter(param, "DS18B20", "InfluxDB_Measurement", false);
+
+    // Update category checkbox state based on Enable parameter value (if found)
+    // This ensures the checkbox reflects the actual Enable parameter from config
+    function updateCategoryFromEnableParam(sensorName) {
+        if (param[sensorName] && param[sensorName]["Enable"] && param[sensorName]["Enable"]["found"]) {
+            var enableValue = param[sensorName]["Enable"]["value1"].toLowerCase();
+            category[sensorName]["enabled"] = (enableValue === "true");
+        }
+    }
+    updateCategoryFromEnableParam("SHT3x");
+    updateCategoryFromEnableParam("DS18B20");
 
     var sel = document.getElementById("Numbers_value1");
     UpdateInputIndividual(sel);
