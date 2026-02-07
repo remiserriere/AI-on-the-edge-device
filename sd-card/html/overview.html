@@ -293,8 +293,10 @@
 			xhttp.onreadystatechange = function() {
 				if (this.readyState == 4) {
 					if (this.status == 200) {
-						try {
-							var data = JSON.parse(xhttp.responseText);
+						// Validate response is not empty and starts with valid JSON character
+						var responseText = xhttp.responseText;
+						if (responseText && responseText.length > 0 && (responseText[0] === '{' || responseText[0] === '[')) {
+							var data = JSON.parse(responseText);
 							var html = '';
 							
 							// Display sensor errors first (if any)
@@ -390,8 +392,8 @@
 							}
 							
 							$('#sensors').html(html);
-						} catch (e) {
-							// Silently ignore if sensors not available
+						} else {
+							// Response is not valid JSON - sensors not available
 							$('#sensors').html('<div style="color: #666; font-style: italic;">No sensors configured</div>');
 						}
 					} else {
