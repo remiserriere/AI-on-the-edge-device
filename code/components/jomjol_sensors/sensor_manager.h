@@ -3,6 +3,7 @@
 #ifndef SENSOR_MANAGER_H
 #define SENSOR_MANAGER_H
 
+#include "sensor_config.h"
 #include <string>
 #include <vector>
 #include <memory>
@@ -10,9 +11,6 @@
 #include <time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
-// Forward declare SensorConfig to avoid circular dependency
-struct SensorConfig;
 
 /**
  * @brief Base class for all sensors

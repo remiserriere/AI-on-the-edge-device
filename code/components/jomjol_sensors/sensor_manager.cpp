@@ -16,20 +16,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-// Import SensorConfig from ClassFlowSensors.h
-struct SensorConfig {
-    bool enable = false;
-    int interval = -1;  // -1 = follow flow (default)
-    bool mqttEnable = true;
-    std::string mqttTopic;
-    bool influxEnable = false;
-    std::string influxMeasurement;
-    
-    // SHT3x specific
-    uint8_t sht3xAddress = 0x44;
-    uint32_t i2cFreq = 100000;
-};
-
 static const char *TAG = "SENSOR_MANAGER";
 
 // Helper function to safely parse integer without exceptions
