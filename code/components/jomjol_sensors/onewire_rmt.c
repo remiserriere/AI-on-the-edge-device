@@ -6,11 +6,13 @@
 #include <string.h>
 
 // Check ESP-IDF version to use appropriate RMT API
+// NOTE: IDF v5 RMT implementation has issues with bidirectional 1-Wire
+// Forcing IDF v4 API for all versions until v5 implementation is fixed
 #if defined(ESP_IDF_VERSION)
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-#define ONEWIRE_NEW_RMT_DRIVER 1
-#include "driver/rmt_tx.h"
-#include "driver/rmt_rx.h"
+#define ONEWIRE_NEW_RMT_DRIVER 0  // Force v4 API even on v5 (v5 has bidirectional issues)
+#include "driver/rmt.h"
+#warning "ESP-IDF v5 detected: Using legacy RMT API for 1-Wire (v5 API has compatibility issues)"
 #else
 #define ONEWIRE_NEW_RMT_DRIVER 0
 #include "driver/rmt.h"
@@ -441,6 +443,13 @@ bool onewire_rmt_reset(onewire_rmt_t* ow)
         ESP_LOGE(TAG, "Failed to send reset pulse: %s", esp_err_to_name(ret));
         return false;
     }
+    
+    // CRITICAL: Wait for RMT transmission to complete before reading
+    ret = rmt_wait_tx_done((rmt_channel_t)ow->rmt_channel, pdMS_TO_TICKS(100));
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "RMT reset pulse timeout: %s", esp_err_to_name(ret));
+        return false;
+    }
 
     // Small delay for signal to stabilize
     ets_delay_us(5);
@@ -477,7 +486,10 @@ void onewire_rmt_write_bit(onewire_rmt_t* ow, uint8_t bit)
         bit_item.duration1 = OW_WRITE_0_RELEASE_TIME;
     }
 
-    rmt_write_items((rmt_channel_t)ow->rmt_channel, &bit_item, 1, true);
+    esp_err_t ret = rmt_write_items((rmt_channel_t)ow->rmt_channel, &bit_item, 1, true);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to write bit %d: %s", bit, esp_err_to_name(ret));
+    }
 }
 
 uint8_t onewire_rmt_read_bit(onewire_rmt_t* ow)
@@ -493,7 +505,19 @@ uint8_t onewire_rmt_read_bit(onewire_rmt_t* ow)
     read_item.level1 = 1;  // Release
     read_item.duration1 = OW_READ_WAIT_TIME;
 
-    rmt_write_items((rmt_channel_t)ow->rmt_channel, &read_item, 1, true);
+    esp_err_t ret = rmt_write_items((rmt_channel_t)ow->rmt_channel, &read_item, 1, true);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initiate read slot: %s", esp_err_to_name(ret));
+        return 0;
+    }
+    
+    // CRITICAL: Wait for RMT transmission to complete before reading
+    // Without this, we might read while RMT is still driving the line
+    ret = rmt_wait_tx_done((rmt_channel_t)ow->rmt_channel, pdMS_TO_TICKS(100));
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "RMT read slot timeout: %s", esp_err_to_name(ret));
+        return 0;
+    }
 
     // Read the bit
     gpio_set_direction(ow->gpio, GPIO_MODE_INPUT);
