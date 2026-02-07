@@ -1459,6 +1459,20 @@
                 <input type="checkbox" id="Category_SHT3x_enabled" value="1"  onclick = 'UpdateAfterCategoryCheck()' unchecked >
                 <label for=Category_SHT3x_enabled>SHT3x (Temperature & Humidity Sensor)</label>
                 </h4>
+                <div style="background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 10px; margin: 5px 0; font-size: 0.9em;">
+                    <strong>⚠️ GPIO Configuration Required:</strong> Before enabling this sensor, you must configure GPIO pins for I²C communication.
+                    <br><br>
+                    <strong>Steps:</strong>
+                    <ol style="margin: 5px 0; padding-left: 20px;">
+                        <li>Scroll down to the <strong>GPIO</strong> section below</li>
+                        <li>Click <strong>"Show Expert Parameters"</strong> checkbox to reveal GPIO settings</li>
+                        <li>Set one GPIO pin to <strong>i2c-sda</strong> (e.g., IO12)</li>
+                        <li>Set another GPIO pin to <strong>i2c-scl</strong> (e.g., IO13)</li>
+                        <li>Save configuration and restart device</li>
+                        <li>Then return here to enable and configure the SHT3x sensor</li>
+                    </ol>
+                    See <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/Sensors-Overview/" target="_blank">Sensors Overview Documentation</a> for detailed wiring and setup instructions.
+                </div>
             </td>
         </tr>
 
@@ -1529,7 +1543,20 @@
                 <input type="checkbox" id="Category_DS18B20_enabled" value="1"  onclick = 'UpdateAfterCategoryCheck()' unchecked >
                 <label for=Category_DS18B20_enabled>DS18B20 (Temperature Sensor - Chainable)</label>
                 </h4>
-                <p style="font-size: 0.9em; color: #666;">Multiple DS18B20 sensors can be chained on same wire. Each sensor is identified by unique ROM ID.</p>
+                <p style="font-size: 0.9em; color: #666; margin: 5px 0;">Multiple DS18B20 sensors can be chained on same wire. Each sensor is identified by unique ROM ID.</p>
+                <div style="background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 10px; margin: 5px 0; font-size: 0.9em;">
+                    <strong>⚠️ GPIO Configuration Required:</strong> Before enabling this sensor, you must configure GPIO pins for 1-Wire communication.
+                    <br><br>
+                    <strong>Steps:</strong>
+                    <ol style="margin: 5px 0; padding-left: 20px;">
+                        <li>Scroll down to the <strong>GPIO</strong> section below</li>
+                        <li>Click <strong>"Show Expert Parameters"</strong> checkbox to reveal GPIO settings</li>
+                        <li>Set one GPIO pin to <strong>onewire</strong> (e.g., IO12)</li>
+                        <li>Save configuration and restart device</li>
+                        <li>Then return here to enable and configure the DS18B20 sensor</li>
+                    </ol>
+                    See <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/Sensors-Overview/" target="_blank">Sensors Overview Documentation</a> for detailed wiring and setup instructions.
+                </div>
             </td>
         </tr>
 
