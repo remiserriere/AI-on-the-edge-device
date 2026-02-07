@@ -582,7 +582,7 @@ bool SensorManager::readConfig(const std::string& configFile)
     bool inDS18B20Section = false;
     
     // SHT3x configuration variables
-    bool sht3xEnable = false;
+    bool sht3xEnable = false;  // Will be set to true if [SHT3x] section is found (uncommented)
     uint8_t sht3xAddress = 0x44;
     int sht3xInterval = -1;  // -1 = follow flow (default)
     bool sht3xMqttEnable = true;
@@ -592,7 +592,7 @@ bool SensorManager::readConfig(const std::string& configFile)
     uint32_t i2cFreq = 100000;
     
     // DS18B20 configuration variables
-    bool ds18b20Enable = false;
+    bool ds18b20Enable = false;  // Will be set to true if [DS18B20] section is found (uncommented)
     int ds18b20Interval = -1;  // -1 = follow flow (default)
     bool ds18b20MqttEnable = true;
     std::string ds18b20MqttTopic = "sensors/temperature";
@@ -606,11 +606,13 @@ bool SensorManager::readConfig(const std::string& configFile)
         if (line.find("[SHT3x]") == 0 || line.find("[SHT3X]") == 0) {
             inSHT3xSection = true;
             inDS18B20Section = false;
+            sht3xEnable = true;  // Section found uncommented, enable sensor
             _enabled = true;
             continue;
         } else if (line.find("[DS18B20]") == 0) {
             inSHT3xSection = false;
             inDS18B20Section = true;
+            ds18b20Enable = true;  // Section found uncommented, enable sensor
             _enabled = true;
             continue;
         } else if (line[0] == '[') {
@@ -634,9 +636,7 @@ bool SensorManager::readConfig(const std::string& configFile)
         
         // SHT3x parameters
         if (inSHT3xSection) {
-            if (param == "ENABLE") {
-                sht3xEnable = (toUpper(value) == "TRUE" || value == "1");
-            } else if (param == "ADDRESS") {
+            if (param == "ADDRESS") {
                 unsigned long tempAddress;
                 // Use base 0 to auto-detect format (supports both 0x44 hex and 68 decimal)
                 if (safeParseULong(value, tempAddress, 0) && tempAddress <= 0xFF) {
@@ -668,9 +668,7 @@ bool SensorManager::readConfig(const std::string& configFile)
         }
         // DS18B20 parameters
         else if (inDS18B20Section) {
-            if (param == "ENABLE") {
-                ds18b20Enable = (toUpper(value) == "TRUE" || value == "1");
-            } else if (param == "INTERVAL") {
+            if (param == "INTERVAL") {
                 if (!safeParseInt(value, ds18b20Interval)) {
                     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Invalid DS18B20 interval value: " + value);
                 }

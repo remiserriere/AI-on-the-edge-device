@@ -243,7 +243,6 @@ function ParseConfig() {
     category[catname]["enabled"] = false;
     category[catname]["found"] = false;
     param[catname] = new Object();
-    ParamAddValue(param, catname, "Enable");
     ParamAddValue(param, catname, "Address");
     ParamAddValue(param, catname, "Interval");
     ParamAddValue(param, catname, "I2C_Frequency");
@@ -257,7 +256,6 @@ function ParseConfig() {
     category[catname]["enabled"] = false;
     category[catname]["found"] = false;
     param[catname] = new Object();
-    ParamAddValue(param, catname, "Enable");
     ParamAddValue(param, catname, "Interval");
     ParamAddValue(param, catname, "MQTT_Enable");
     ParamAddValue(param, catname, "MQTT_Topic");
