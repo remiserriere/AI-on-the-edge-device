@@ -445,10 +445,13 @@ bool onewire_rmt_reset(onewire_rmt_t* ow)
     }
     
     // CRITICAL: Wait for RMT transmission to complete before reading
-    ret = rmt_wait_tx_done((rmt_channel_t)ow->rmt_channel, pdMS_TO_TICKS(100));
+    // Note: rmt_wait_tx_done may not be available in all IDF versions
+    // If it fails or times out, we continue anyway with a delay
+    ret = rmt_wait_tx_done((rmt_channel_t)ow->rmt_channel, pdMS_TO_TICKS(10));
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "RMT reset pulse timeout: %s", esp_err_to_name(ret));
-        return false;
+        ESP_LOGW(TAG, "RMT wait timeout, using delay fallback");
+        // Fallback: use delay to ensure transmission completed
+        ets_delay_us(OW_RESET_PULSE_TIME + OW_RESET_WAIT_TIME + 10);
     }
 
     // Small delay for signal to stabilize
@@ -512,11 +515,11 @@ uint8_t onewire_rmt_read_bit(onewire_rmt_t* ow)
     }
     
     // CRITICAL: Wait for RMT transmission to complete before reading
-    // Without this, we might read while RMT is still driving the line
-    ret = rmt_wait_tx_done((rmt_channel_t)ow->rmt_channel, pdMS_TO_TICKS(100));
+    // If wait fails, use delay fallback
+    ret = rmt_wait_tx_done((rmt_channel_t)ow->rmt_channel, pdMS_TO_TICKS(10));
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "RMT read slot timeout: %s", esp_err_to_name(ret));
-        return 0;
+        // Fallback: use delay
+        ets_delay_us(OW_READ_INIT_TIME + OW_READ_WAIT_TIME + 5);
     }
 
     // Read the bit
