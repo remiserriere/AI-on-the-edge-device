@@ -327,7 +327,11 @@ esp_err_t onewire_rmt_init(onewire_rmt_t* ow, gpio_num_t gpio)
     // Find an available RMT channel
     // Try to find a free channel, preferring higher-numbered channels
     // to avoid conflicts with LED control (typically uses lower channels)
-    // Note: RMT_CHANNEL_MAX varies by ESP32 variant (4-8 channels)
+    // Note: RMT_CHANNEL_MAX varies by ESP32 variant:
+    //   - ESP32: 8 channels (0-7)
+    //   - ESP32-S2: 4 channels (0-3)
+    //   - ESP32-S3: 4 channels (0-3)
+    //   - ESP32-C3: 2 channels (0-1)
     rmt_channel_t channel = RMT_CHANNEL_MAX;
     int start_channel = (RMT_CHANNEL_MAX > 4) ? 4 : (RMT_CHANNEL_MAX / 2);
     
