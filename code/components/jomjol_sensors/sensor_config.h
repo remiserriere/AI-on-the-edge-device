@@ -6,16 +6,17 @@
 /**
  * @brief DS18B20 1-Wire driver mode
  * 
- * USE_ONEWIRE_RMT: Use hardware-based RMT peripheral for precise timing (recommended)
+ * USE_ONEWIRE_RMT: Use hardware-based RMT peripheral for precise timing
  *   - Benefits: Hardware timing, reduced CRC errors, better reliability, lower CPU overhead
  *   - Compatible with ESP32CAM
+ *   - NOTE: Currently disabled by default due to compatibility issues - under development
  * 
- * Software bit-banging (default if not defined): Software-based timing
- *   - Benefits: No RMT channel usage, simpler implementation
- *   - Drawbacks: Timing affected by interrupts, more CRC errors
+ * Software bit-banging (default): Software-based timing
+ *   - Benefits: Proven reliability, no RMT channel usage
+ *   - Drawbacks: Timing affected by interrupts, more CRC errors (mitigated by retries)
  */
 #ifndef USE_ONEWIRE_RMT
-#define USE_ONEWIRE_RMT 1  // Default to hardware RMT for better reliability
+#define USE_ONEWIRE_RMT 0  // Default to software mode for stability (RMT under development)
 #endif
 
 /**

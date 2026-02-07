@@ -1,15 +1,17 @@
 # [UNRELEASED] - TBD
 
 ### Core Changes and Bug fixes
-- **DS18B20 Hardware RMT Implementation**: Switched DS18B20 1-Wire communication from software bit-banging to hardware-based RMT peripheral
-  - Provides hardware-precise timing (1μs resolution) not affected by CPU interrupts
-  - Reduces CRC errors from 5-10% to <1%
-  - Improves sensor detection success rate from 70-80% to >95%
-  - Lowers CPU overhead during sensor reads
+- **DS18B20 Hardware RMT Implementation**: Added hardware RMT-based 1-Wire driver as alternative to software bit-banging
+  - **Status**: Currently disabled by default while resolving compatibility issues
+  - **Default Mode**: Software bit-banging (proven, reliable)
+  - **RMT Mode**: Available for testing (requires manual enable in sensor_config.h)
+  - Provides hardware-precise timing (1μs resolution) when enabled
+  - Reduces CRC errors from 5-10% to <1% (when working)
+  - Improves sensor detection from 70-80% to >95% (when working)
   - Supports both ESP-IDF v4.x and v5.x APIs
-  - Automatically enabled by default, backward compatible with software mode if needed
   - Compatible with all ESP32 variants (ESP32, S2, S3, C3)
-  - See [DS18B20_HARDWARE_RMT.md](DS18B20_HARDWARE_RMT.md) for technical details
+  - **Bug Fix**: Added missing GPIO pull-up configuration in IDF v5 implementation
+  - See [DS18B20_RMT_TROUBLESHOOTING.md](DS18B20_RMT_TROUBLESHOOTING.md) for details
 
 # [16.1.0] - 2026-01-11
 

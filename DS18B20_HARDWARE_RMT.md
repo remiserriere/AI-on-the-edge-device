@@ -1,8 +1,16 @@
 # DS18B20 Hardware RMT Implementation
 
+## Current Status
+
+⚠️ **Important:** The RMT implementation is currently **disabled by default** while we resolve compatibility issues. The proven software bit-banging mode is used by default.
+
+**Status:** Under active development and testing
+**Default Mode:** Software bit-banging (reliable, proven)
+**RMT Mode:** Available for testing (set `USE_ONEWIRE_RMT 1` in `sensor_config.h`)
+
 ## Overview
 
-The DS18B20 sensor driver now supports **hardware-based 1-Wire communication** using the ESP32's RMT (Remote Control Transceiver) peripheral. This provides significant improvements over the previous software bit-banging approach.
+The DS18B20 sensor driver supports **hardware-based 1-Wire communication** using the ESP32's RMT (Remote Control Transceiver) peripheral as an alternative to software bit-banging.
 
 ## Benefits of Hardware RMT
 

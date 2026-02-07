@@ -149,6 +149,10 @@ esp_err_t onewire_rmt_init(onewire_rmt_t* ow, gpio_num_t gpio)
     handle->rx_config.signal_range_min_ns = 1000;  // 1μs minimum
     handle->rx_config.signal_range_max_ns = 1000000;  // 1000μs maximum
 
+    // CRITICAL: Configure GPIO with pull-up for 1-Wire
+    // The io_od_mode flag enables open-drain in RMT, but we still need pull-up
+    gpio_set_pull_mode(gpio, GPIO_PULLUP_ONLY);
+
     ow->initialized = true;
     ESP_LOGI(TAG, "1-Wire RMT initialized on GPIO%d (IDF v5.x)", gpio);
     
