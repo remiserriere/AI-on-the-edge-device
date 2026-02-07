@@ -21,5 +21,3 @@ struct SensorConfig {
     uint8_t sht3xAddress = 0x44;  // Default I2C address
     uint32_t i2cFreq = 100000;    // Default 100kHz
 };
-
-#endif // SENSOR_CONFIG_H
