@@ -379,6 +379,28 @@ function ParseConfig() {
         param["System"]["RSSIThreshold"]["enabled"] = false;
         param["System"]["RSSIThreshold"]["value1"] = "0";
     }
+
+    // Fix for sensor sections: If a section is found but all parameters are commented/missing,
+    // treat the section as not found to avoid validation warnings
+    var sensorCategories = ["SHT3x", "DS18B20"];
+    for (var i = 0; i < sensorCategories.length; i++) {
+        var catname = sensorCategories[i];
+        if (category[catname]["found"] == true) {
+            // Check if any parameter is enabled (uncommented)
+            var hasEnabledParam = false;
+            for (var paramname in param[catname]) {
+                if (param[catname][paramname]["enabled"] == true) {
+                    hasEnabledParam = true;
+                    break;
+                }
+            }
+            // If no parameters are enabled, treat section as not found
+            if (!hasEnabledParam) {
+                category[catname]["found"] = false;
+                category[catname]["enabled"] = false;
+            }
+        }
+    }
 }
 
 function ParamAddValue(param, _cat, _param, _anzParam = 1, _isNUMBER = false, _defaultValue = "", _checkRegExList = null) {

@@ -3478,7 +3478,7 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
             if (element.tagName.toLowerCase() == "select") {
                 var textToFind = NUMBERS[_number][_cat][_name]["value"+j];
 				
-                if (textToFind == undefined) {
+                if (textToFind == undefined || textToFind === "") {
                     continue;
                 }
 
@@ -3528,7 +3528,7 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
             if (element.tagName.toLowerCase() == "select") {
                 var textToFind = _param[_cat][_name]["value"+j];
 				
-                if (textToFind == undefined) {
+                if (textToFind == undefined || textToFind === "") {
                     continue;
                 }
                 
