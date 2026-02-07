@@ -234,7 +234,7 @@ bool SensorSHT3x::readData()
         "sht3x_read",
         4096,  // Stack size
         this,  // Parameter
-        tskIDLE_PRIORITY + 1,  // Priority
+        tskIDLE_PRIORITY,  // Priority - low for reading (not critical)
         &_readTaskHandle,
         0  // Core 0
     );

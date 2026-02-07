@@ -130,7 +130,7 @@ bool SensorBase::startPeriodicTask()
         taskName.c_str(),
         4096,  // Stack size
         this,  // Parameter passed to task
-        tskIDLE_PRIORITY + 1,  // Priority
+        tskIDLE_PRIORITY,  // Priority - low for periodic reading (not critical)
         &_taskHandle,
         0  // Core 0
     );
@@ -525,6 +525,11 @@ bool SensorManager::readConfig(const std::string& configFile)
                           "Failed to initialize I2C bus after " + std::to_string(SENSOR_INIT_RETRY_COUNT) + " retries",
                           SENSOR_INIT_RETRY_COUNT);
             LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "SHT3x initialization aborted - I2C bus init failed");
+            
+            // Add delay after I2C failure to allow GPIO states to settle before DS18B20 init
+            // This prevents I2C bus issues from affecting 1-Wire GPIO initialization
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Waiting for GPIO states to stabilize after I2C failure...");
+            vTaskDelay(pdMS_TO_TICKS(200));
         } else {
             // I2C bus is ready, create and initialize sensor with retry
             auto sensor = std::make_unique<SensorSHT3x>(
