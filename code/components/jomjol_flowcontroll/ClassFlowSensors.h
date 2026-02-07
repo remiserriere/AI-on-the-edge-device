@@ -4,7 +4,9 @@
 #define CLASSFLOWSENSORS_H
 
 #include "ClassFlow.h"
+#include "../jomjol_sensors/sensor_config.h"
 #include <memory>
+#include <map>
 
 class SensorManager;
 class ClassFlowControll;
@@ -40,6 +42,10 @@ private:
     std::unique_ptr<SensorManager> _sensorManager;
     ClassFlowControll* _flowController;
     bool _initialized;
+    
+    // Store configuration for all sensor types
+    std::map<std::string, SensorConfig> _sensorConfigs;
+    bool _configParsed;
 };
 
 #endif // CLASSFLOWSENSORS_H
