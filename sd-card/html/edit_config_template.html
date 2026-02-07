@@ -2804,14 +2804,14 @@ function ReadParameterAll() {
 
     // Update category checkbox state based on Enable parameter value (if found)
     // This ensures the checkbox reflects the actual Enable parameter from config
-    if (param["SHT3x"] && param["SHT3x"]["Enable"] && param["SHT3x"]["Enable"]["found"]) {
-        var enableValue = param["SHT3x"]["Enable"]["value1"].toLowerCase();
-        category["SHT3x"]["enabled"] = (enableValue === "true");
+    function updateCategoryFromEnableParam(sensorName) {
+        if (param[sensorName] && param[sensorName]["Enable"] && param[sensorName]["Enable"]["found"]) {
+            var enableValue = param[sensorName]["Enable"]["value1"].toLowerCase();
+            category[sensorName]["enabled"] = (enableValue === "true");
+        }
     }
-    if (param["DS18B20"] && param["DS18B20"]["Enable"] && param["DS18B20"]["Enable"]["found"]) {
-        var enableValue = param["DS18B20"]["Enable"]["value1"].toLowerCase();
-        category["DS18B20"]["enabled"] = (enableValue === "true");
-    }
+    updateCategoryFromEnableParam("SHT3x");
+    updateCategoryFromEnableParam("DS18B20");
 
     var sel = document.getElementById("Numbers_value1");
     UpdateInputIndividual(sel);
