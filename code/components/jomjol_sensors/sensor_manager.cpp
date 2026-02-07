@@ -605,7 +605,7 @@ bool SensorManager::readConfig(const std::string& configFile)
         bool initSuccess = false;
         for (int retry = 0; retry < SENSOR_INIT_RETRY_COUNT; retry++) {
             if (retry > 0) {
-                // Longer delays: 200ms, 400ms, 600ms for hardware stabilization
+                // Longer delays: 200ms, 400ms (for retries 2 and 3)
                 int delayMs = 200 * retry;
                 LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20 sensor init retry " + std::to_string(retry + 1) + 
                                     " after " + std::to_string(delayMs) + "ms");
