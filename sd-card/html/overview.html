@@ -331,29 +331,13 @@
 										timeStr = 'Not yet read';
 									}
 									
+									// Each sensor is now its own object with a unique ID
 									if (sensor.name === 'SHT3x') {
 										html += '<span style="display: inline-block; margin-right: 15px;">🌡️ ' + sensor.temperature.toFixed(1) + sensor.unit_temp + '</span>';
 										html += '<span style="display: inline-block; margin-right: 15px;">💧 ' + sensor.humidity.toFixed(1) + sensor.unit_humidity + '</span>';
 										html += '<span style="font-size: 0.85em; color: #666;">(' + timeStr + ')</span><br>';
 									} else if (sensor.name === 'DS18B20') {
-										html += '<span>🌡️ DS18B20: ';
-										if (sensor.count === 1) {
-											html += sensor.temperatures[0].toFixed(1) + sensor.unit;
-											// Show ROM ID if available
-											if (sensor.rom_ids && sensor.rom_ids[0]) {
-												html += ' [' + sensor.rom_ids[0] + ']';
-											}
-										} else {
-											sensor.temperatures.forEach(function(temp, idx) {
-												if (idx > 0) html += ', ';
-												html += temp.toFixed(1) + sensor.unit;
-												// Show ROM ID for each sensor if available
-												if (sensor.rom_ids && sensor.rom_ids[idx]) {
-													html += ' [' + sensor.rom_ids[idx] + ']';
-												}
-											});
-										}
-										html += '</span>';
+										html += '<span>🌡️ ' + sensor.temperature.toFixed(1) + sensor.unit + ' [' + sensor.id + ']</span>';
 										html += '<span style="font-size: 0.85em; color: #666;"> (' + timeStr + ')</span><br>';
 									}
 								});

@@ -647,54 +647,53 @@ std::string SensorManager::getJSON()
     std::stringstream json;
     json << "{";
     
-    // Add sensors data
+    // Add sensors data - each physical sensor is its own object
     json << "\"sensors\":[";
     
     bool first = true;
     for (const auto& sensor : _sensors) {
-        if (!first) {
-            json << ",";
-        }
-        first = false;
-        
-        json << "{";
-        json << "\"name\":\"" << sensor->getName() << "\"";
-        json << ",\"status\":\"ok\"";
-        
         // Add sensor-specific data
         if (sensor->getName() == "SHT3x") {
             auto* sht3x = static_cast<SensorSHT3x*>(sensor.get());
             if (sht3x) {
+                if (!first) {
+                    json << ",";
+                }
+                first = false;
+                
+                json << "{";
+                json << "\"name\":\"SHT3x\"";
+                json << ",\"id\":\"SHT3x-0x44\"";  // Could be made dynamic if we support multiple addresses
+                json << ",\"status\":\"ok\"";
                 json << ",\"temperature\":" << sht3x->getTemperature();
                 json << ",\"humidity\":" << sht3x->getHumidity();
                 json << ",\"unit_temp\":\"°C\"";
                 json << ",\"unit_humidity\":\"%\"";
+                json << ",\"last_read\":" << sensor->getLastReadTime();
+                json << "}";
             }
         } else if (sensor->getName() == "DS18B20") {
             auto* ds18b20 = static_cast<SensorDS18B20*>(sensor.get());
             if (ds18b20) {
                 int count = ds18b20->getSensorCount();
-                json << ",\"count\":" << count;
-                json << ",\"temperatures\":[";
+                // Create a separate object for each DS18B20 sensor on the bus
                 for (int i = 0; i < count; i++) {
-                    if (i > 0) json << ",";
-                    json << ds18b20->getTemperature(i);
+                    if (!first) {
+                        json << ",";
+                    }
+                    first = false;
+                    
+                    json << "{";
+                    json << "\"name\":\"DS18B20\"";
+                    json << ",\"id\":\"" << ds18b20->getRomId(i) << "\"";
+                    json << ",\"status\":\"ok\"";
+                    json << ",\"temperature\":" << ds18b20->getTemperature(i);
+                    json << ",\"unit\":\"°C\"";
+                    json << ",\"last_read\":" << sensor->getLastReadTime();
+                    json << "}";
                 }
-                json << "]";
-                json << ",\"rom_ids\":[";
-                for (int i = 0; i < count; i++) {
-                    if (i > 0) json << ",";
-                    json << "\"" << ds18b20->getRomId(i) << "\"";
-                }
-                json << "]";
-                json << ",\"unit\":\"°C\"";
             }
         }
-        
-        // Add last read timestamp
-        json << ",\"last_read\":" << sensor->getLastReadTime();
-        
-        json << "}";
     }
     
     json << "]";
