@@ -2800,8 +2800,7 @@ function ReadParameterAll() {
     ReadParameter(param, "System", "RSSIThreshold", true);
     ReadParameter(param, "System", "CPUFrequency", true);
 
-    // Sensor parameters
-    ReadParameter(param, "SHT3x", "Enable", false);
+    // Sensor parameters (Note: Enable parameter is handled via category checkbox, not ReadParameter)
     ReadParameter(param, "SHT3x", "Address", false);
     ReadParameter(param, "SHT3x", "Interval", false);
     ReadParameter(param, "SHT3x", "I2C_Frequency", false);
@@ -2810,7 +2809,6 @@ function ReadParameterAll() {
     ReadParameter(param, "SHT3x", "InfluxDB_Enable", false);
     ReadParameter(param, "SHT3x", "InfluxDB_Measurement", false);
 
-    ReadParameter(param, "DS18B20", "Enable", false);
     ReadParameter(param, "DS18B20", "Interval", false);
     ReadParameter(param, "DS18B20", "MQTT_Enable", false);
     ReadParameter(param, "DS18B20", "MQTT_Topic", false);
