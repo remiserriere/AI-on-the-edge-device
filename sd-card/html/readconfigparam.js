@@ -392,9 +392,10 @@ function ParseConfig() {
         param["System"]["RSSIThreshold"]["value1"] = "0";
     }
 
-    // Fix for sensor sections: If a section header is commented (enabled=false) and all 
-    // parameters are commented/missing, treat the section as not found to avoid validation warnings.
-    // However, if the section header is uncommented (enabled=true), keep it as found so defaults are used.
+    // Fix for sensor sections: If a section header is commented (;[SHT3x]) then 
+    // category[catname]["enabled"] will be false. If all parameters are also commented/missing,
+    // treat the section as "not found" to avoid validation warnings.
+    // However, if the section header is uncommented ([SHT3x]), keep it as "found" so defaults are used.
     var sensorCategories = ["SHT3x", "DS18B20"];
     for (var i = 0; i < sensorCategories.length; i++) {
         var catname = sensorCategories[i];
