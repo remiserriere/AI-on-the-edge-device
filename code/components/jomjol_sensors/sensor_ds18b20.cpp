@@ -29,6 +29,14 @@ static const char *TAG = "DS18B20";
 #define DS18B20_CMD_SEARCH_ROM      0xF0
 #define DS18B20_CMD_MATCH_ROM       0x55
 
+// Timing constants for improved reliability (in milliseconds)
+// Based on DS18B20 datasheet and empirical testing to reduce CRC errors
+#define DS18B20_DELAY_AFTER_RESET_MS       10   // Recovery time after reset pulse
+#define DS18B20_DELAY_AFTER_MATCH_ROM_MS   2    // Allow sensor to process MATCH_ROM
+#define DS18B20_DELAY_BEFORE_READ_CMD_MS   2    // Stabilization before READ command
+#define DS18B20_DELAY_AFTER_CONVERSION_MS  10   // Settling time after conversion completes
+#define DS18B20_DELAY_BETWEEN_RETRIES_MS   50   // Base delay for exponential backoff
+
 SensorDS18B20::SensorDS18B20(gpio_num_t gpio,
                              const std::string& mqttTopic,
                              const std::string& influxMeasurement,
@@ -294,6 +302,9 @@ bool SensorDS18B20::startConversion(size_t sensorIndex)
         return false;
     }
     
+    // Recovery time after reset pulse (important for bus stability)
+    vTaskDelay(pdMS_TO_TICKS(DS18B20_DELAY_AFTER_RESET_MS));
+    
     // Match ROM - address specific sensor
     ow_write_byte(_gpio, DS18B20_CMD_MATCH_ROM);
     
@@ -301,6 +312,9 @@ bool SensorDS18B20::startConversion(size_t sensorIndex)
     for (int i = 0; i < 8; i++) {
         ow_write_byte(_gpio, _romIds[sensorIndex][i]);
     }
+    
+    // Allow sensor to process MATCH_ROM command
+    vTaskDelay(pdMS_TO_TICKS(DS18B20_DELAY_AFTER_MATCH_ROM_MS));
     
     // Start temperature conversion
     ow_write_byte(_gpio, DS18B20_CMD_CONVERT_T);
@@ -333,8 +347,8 @@ bool SensorDS18B20::readScratchpad(size_t sensorIndex)
         return false;
     }
     
-    // Small delay after reset for bus stabilization
-    vTaskDelay(pdMS_TO_TICKS(1));
+    // Recovery time after reset pulse for bus stabilization
+    vTaskDelay(pdMS_TO_TICKS(DS18B20_DELAY_AFTER_RESET_MS));
     
     // Match ROM again
     ow_write_byte(_gpio, DS18B20_CMD_MATCH_ROM);
@@ -344,11 +358,17 @@ bool SensorDS18B20::readScratchpad(size_t sensorIndex)
         ow_write_byte(_gpio, _romIds[sensorIndex][i]);
     }
     
-    // Small delay before read command for better reliability
-    vTaskDelay(pdMS_TO_TICKS(1));
+    // Allow sensor to process MATCH_ROM command
+    vTaskDelay(pdMS_TO_TICKS(DS18B20_DELAY_AFTER_MATCH_ROM_MS));
+    
+    // Additional delay before read command for better reliability
+    vTaskDelay(pdMS_TO_TICKS(DS18B20_DELAY_BEFORE_READ_CMD_MS));
     
     // Read scratchpad
     ow_write_byte(_gpio, DS18B20_CMD_READ_SCRATCHPAD);
+    
+    // Small delay to allow sensor to prepare data
+    vTaskDelay(pdMS_TO_TICKS(1));
     
     // Read 9 bytes
     uint8_t data[9];
@@ -451,7 +471,7 @@ void SensorDS18B20::readTask()
             if (!startConversion(sensorIndex)) {
                 if (retry < maxRetries - 1) {
                     // Exponential backoff: 50ms, 100ms, 150ms, 200ms, 250ms
-                    int delayMs = 50 + (retry * 50);
+                    int delayMs = DS18B20_DELAY_BETWEEN_RETRIES_MS * (retry + 1);
                     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to start conversion for sensor #" + 
                                         std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1) + 
                                         " after " + std::to_string(delayMs) + "ms");
@@ -479,7 +499,7 @@ void SensorDS18B20::readTask()
             
             if (!conversionComplete) {
                 if (retry < maxRetries - 1) {
-                    int delayMs = 50 + (retry * 50);
+                    int delayMs = DS18B20_DELAY_BETWEEN_RETRIES_MS * (retry + 1);  // 50ms, 100ms, 150ms, 200ms, 250ms
                     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Conversion timeout for sensor #" + 
                                         std::to_string(sensorIndex + 1) + ", retry " + std::to_string(retry + 1) + 
                                         " after " + std::to_string(delayMs) + "ms");
@@ -491,7 +511,7 @@ void SensorDS18B20::readTask()
             
             // Add settling delay after conversion completes to reduce CRC errors
             // This gives the sensor time to stabilize the data before we read it
-            vTaskDelay(pdMS_TO_TICKS(3));
+            vTaskDelay(pdMS_TO_TICKS(DS18B20_DELAY_AFTER_CONVERSION_MS));
             
             // Read the data
             if (readScratchpad(sensorIndex)) {
@@ -500,7 +520,7 @@ void SensorDS18B20::readTask()
                 break;
             } else if (retry < maxRetries - 1) {
                 // Exponential backoff on read failures
-                int delayMs = 50 + (retry * 50);
+                int delayMs = DS18B20_DELAY_BETWEEN_RETRIES_MS * (retry + 1);
                 LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Read failed for sensor #" + 
                                     std::to_string(sensorIndex + 1) + " (likely CRC error), retry " + 
                                     std::to_string(retry + 1) + " after " + std::to_string(delayMs) + "ms");
