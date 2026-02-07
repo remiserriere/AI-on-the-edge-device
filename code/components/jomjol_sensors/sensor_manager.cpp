@@ -224,7 +224,9 @@ bool SensorManager::initFromConfig(const std::string& configFile, const std::map
     
     // Check if any sensor is enabled
     bool anySensorEnabled = false;
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Checking " + std::to_string(sensorConfigs.size()) + " sensor configuration(s)");
     for (const auto& pair : sensorConfigs) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "  - " + pair.first + ": enable=" + (pair.second.enable ? "true" : "false"));
         if (pair.second.enable) {
             anySensorEnabled = true;
             break;
