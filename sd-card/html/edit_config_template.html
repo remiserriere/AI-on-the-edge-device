@@ -1490,7 +1490,10 @@
         <tr class="SHT3xItem">
             <td class="indent1">I²C Frequency (Hz)</td>
             <td>
-                <input type="number" id="SHT3x_I2C_Frequency_value1" value="100000">
+                <select id="SHT3x_I2C_Frequency_value1">
+                    <option value="100000">100000 (Standard - 100 kHz, recommended)</option>
+                    <option value="400000">400000 (Fast - 400 kHz, advanced)</option>
+                </select>
             </td>
             <td>$TOOLTIP_SHT3x_I2C_Frequency</td>
         </tr>
