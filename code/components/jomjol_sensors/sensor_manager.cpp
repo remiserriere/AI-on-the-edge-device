@@ -584,6 +584,10 @@ bool SensorManager::readConfig(const std::string& configFile)
     if (ds18b20Enable && onewirePin >= 0) {
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Attempting to initialize DS18B20 sensor...");
         
+        // Add initial delay to allow system boot to stabilize before 1-Wire init
+        // This is especially important when I2C init fails, as GPIO subsystem needs time to recover
+        vTaskDelay(pdMS_TO_TICKS(100));
+        
         auto sensor = std::make_unique<SensorDS18B20>(
             (gpio_num_t)onewirePin,
             ds18b20MqttTopic,
@@ -597,10 +601,12 @@ bool SensorManager::readConfig(const std::string& configFile)
                             ", interval:" + (ds18b20Interval < 0 ? "follow flow" : std::to_string(ds18b20Interval) + "s") + ")");
         
         // Try to initialize the sensor with retries
+        // Use longer delays between retries to allow hardware to stabilize
         bool initSuccess = false;
         for (int retry = 0; retry < SENSOR_INIT_RETRY_COUNT; retry++) {
             if (retry > 0) {
-                int delayMs = 100 * retry;  // 100ms, 200ms
+                // Longer delays: 200ms, 400ms for hardware stabilization
+                int delayMs = 200 * retry;
                 LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20 sensor init retry " + std::to_string(retry + 1) + 
                                     " after " + std::to_string(delayMs) + "ms");
                 vTaskDelay(pdMS_TO_TICKS(delayMs));
