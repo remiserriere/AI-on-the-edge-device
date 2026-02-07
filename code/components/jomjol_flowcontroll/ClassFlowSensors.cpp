@@ -6,6 +6,10 @@
 
 #include <sstream>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wexceptions"
+// Or use a compiler-specific flag if needed
+
 static const char *TAG = "FLOW_SENSORS";
 
 ClassFlowSensors::ClassFlowSensors() : _initialized(false)
