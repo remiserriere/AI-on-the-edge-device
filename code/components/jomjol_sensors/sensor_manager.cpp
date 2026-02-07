@@ -130,7 +130,7 @@ bool SensorBase::startPeriodicTask()
         taskName.c_str(),
         4096,  // Stack size
         this,  // Parameter passed to task
-        tskIDLE_PRIORITY + 1,  // Priority
+        tskIDLE_PRIORITY,  // Priority - low for periodic reading (not critical)
         &_taskHandle,
         0  // Core 0
     );
@@ -525,6 +525,11 @@ bool SensorManager::readConfig(const std::string& configFile)
                           "Failed to initialize I2C bus after " + std::to_string(SENSOR_INIT_RETRY_COUNT) + " retries",
                           SENSOR_INIT_RETRY_COUNT);
             LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "SHT3x initialization aborted - I2C bus init failed");
+            
+            // Add delay after I2C failure to allow GPIO states to settle before DS18B20 init
+            // This prevents I2C bus issues from affecting 1-Wire GPIO initialization
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Waiting for GPIO states to stabilize after I2C failure...");
+            vTaskDelay(pdMS_TO_TICKS(200));
         } else {
             // I2C bus is ready, create and initialize sensor with retry
             auto sensor = std::make_unique<SensorSHT3x>(
@@ -579,6 +584,10 @@ bool SensorManager::readConfig(const std::string& configFile)
     if (ds18b20Enable && onewirePin >= 0) {
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Attempting to initialize DS18B20 sensor...");
         
+        // Add initial delay to allow system boot to stabilize before 1-Wire init
+        // This helps GPIO subsystem settle, especially beneficial after I2C init failures
+        vTaskDelay(pdMS_TO_TICKS(100));
+        
         auto sensor = std::make_unique<SensorDS18B20>(
             (gpio_num_t)onewirePin,
             ds18b20MqttTopic,
@@ -592,10 +601,12 @@ bool SensorManager::readConfig(const std::string& configFile)
                             ", interval:" + (ds18b20Interval < 0 ? "follow flow" : std::to_string(ds18b20Interval) + "s") + ")");
         
         // Try to initialize the sensor with retries
+        // Use longer delays between retries to allow hardware to stabilize
         bool initSuccess = false;
         for (int retry = 0; retry < SENSOR_INIT_RETRY_COUNT; retry++) {
             if (retry > 0) {
-                int delayMs = 100 * retry;  // 100ms, 200ms
+                // Longer delays: 200ms, 400ms (for retries 2 and 3)
+                int delayMs = 200 * retry;
                 LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20 sensor init retry " + std::to_string(retry + 1) + 
                                     " after " + std::to_string(delayMs) + "ms");
                 vTaskDelay(pdMS_TO_TICKS(delayMs));

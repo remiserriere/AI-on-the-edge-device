@@ -34,6 +34,7 @@ protected:
 	ClassFlowCNNGeneral* flowdigit;
 //	ClassFlowDigit* flowdigit;
 	ClassFlowTakeImage* flowtakeimage;
+	ClassFlowSensors* flowsensors;
 	ClassFlow* CreateClassFlow(std::string _type);
 
 	bool AutoStart;
