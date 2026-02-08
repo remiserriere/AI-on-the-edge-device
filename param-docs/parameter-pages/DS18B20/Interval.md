@@ -124,7 +124,7 @@ Consider InfluxDB storage and retention policies.
 
 ```ini
 [GPIO]
-IO12 = onewire       ; 3 sensors on same wire
+IO3 = onewire               ; * Requires disabling USB logging       ; 3 sensors on same wire
 
 [DS18B20]
 Enable = true

@@ -76,9 +76,13 @@ Sensors are configured in **three parts** (in this order):
 2. Scroll to the **GPIO** section
 3. Click **"Show Expert Options"** or **"Advanced Settings"**
 4. Configure the required GPIO pins:
-   - **For DS18B20**: Set one GPIO pin (e.g., IO12) to `onewire` mode
-   - **For SHT3x**: Set two GPIO pins (e.g., IO12 to `i2c-sda`, IO13 to `i2c-scl`)
+   - **For DS18B20**: Set one GPIO pin (e.g., IO3) to `onewire` mode *
+   - **For SHT3x**: Set two GPIO pins (e.g., IO3 to `i2c-sda`, IO1 to `i2c-scl`) *
 5. Save and restart if required
+
+**CRITICAL**: Do NOT use GPIO12 for sensors! It's a boot strapping pin that will prevent boot when pull-up resistors are connected.
+
+\* Requires disabling USB serial logging
 
 **Detailed GPIO Configuration Guides:**
 - [GPIO 1-Wire Configuration](GPIO/OneWire.md) - For DS18B20 sensors

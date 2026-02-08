@@ -51,8 +51,8 @@ Use this setting only if:
 2. Scroll to the **GPIO** section
 3. Click **"Show Expert Options"** or **"Advanced Settings"** to reveal GPIO configuration
 4. Configure two pins:
-   - One pin set to **`i2c-sda`** (e.g., IO12)
-   - One pin set to **`i2c-scl`** (e.g., IO13)
+   - One pin set to **`i2c-sda`** (e.g., IO3) *
+   - One pin set to **`i2c-scl`** (e.g., IO1) *
 5. Save configuration and restart
 
 See detailed guides:
@@ -81,8 +81,8 @@ See detailed guides:
 
 ```ini
 [GPIO]
-IO12 = i2c-sda
-IO13 = i2c-scl
+IO3 = i2c-sda                ; * Requires disabling USB logging
+IO1 = i2c-scl                ; * Requires disabling USB logging
 
 [SHT3x]
 Enable = true

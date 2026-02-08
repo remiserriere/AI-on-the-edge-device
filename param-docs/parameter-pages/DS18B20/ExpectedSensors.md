@@ -57,12 +57,13 @@ The system validates the detected sensor count against the expected value and re
 **Example:**
 ```ini
 [GPIO]
-IO12 = onewire              ; 3 DS18B20 sensors wired in parallel
+IO3 = onewire              ; 3 DS18B20 sensors wired in parallel *
 
 [DS18B20]
 ExpectedSensors = 3         ; Expect exactly 3 sensors
 MQTT_Enable = true
 ```
+\* Requires disabling USB serial logging. **DO NOT use GPIO12** - boot strapping pin prevents boot!
 
 ## How Retry Logic Works
 
@@ -252,7 +253,7 @@ If no sensors are detected even with retries:
 
 ```ini
 [GPIO]
-IO12 = onewire
+IO3 = onewire               ; * Requires disabling USB logging
 
 [DS18B20]
 ExpectedSensors = 1         ; Validate sensor detected
@@ -268,7 +269,7 @@ MQTT_Topic = enclosure/temperature
 
 ```ini
 [GPIO]
-IO12 = onewire              ; 3 sensors on same bus
+IO3 = onewire              ; 3 sensors on same bus *
 
 [DS18B20]
 ExpectedSensors = 3         ; Validate all 3 detected
@@ -286,7 +287,7 @@ InfluxDB_Measurement = environment
 
 ```ini
 [GPIO]
-IO12 = onewire
+IO3 = onewire               ; * Requires disabling USB logging
 
 [DS18B20]
 ExpectedSensors = -1        ; Auto-detect whatever is connected
@@ -300,7 +301,7 @@ MQTT_Enable = true
 
 ### Successful Detection with Expected Count
 ```
-[INFO] DS18B20: Initializing DS18B20 sensor on GPIO12
+[INFO] DS18B20: Initializing DS18B20 sensor on GPIO3
 [INFO] DS18B20: Expected sensor count: 3
 [INFO] DS18B20: === DS18B20 ROM Search (startup only) ===
 [INFO] DS18B20: Scanning 1-Wire bus for DS18B20 devices...

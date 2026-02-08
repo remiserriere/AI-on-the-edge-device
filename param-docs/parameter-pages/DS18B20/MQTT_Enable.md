@@ -225,7 +225,7 @@ Password = mqtt_pass
 MainTopic = watermeter
 
 [GPIO]
-IO12 = onewire
+IO3 = onewire               ; * Requires disabling USB logging
 
 [DS18B20]
 Enable = true
