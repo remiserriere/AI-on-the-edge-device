@@ -57,7 +57,7 @@ The system validates the detected sensor count against the expected value and re
 **Example:**
 ```ini
 [GPIO]
-IO3 = onewire              ; 3 DS18B20 sensors wired in parallel *
+IO3 = onewire              ; * 3 DS18B20 sensors wired in parallel
 
 [DS18B20]
 ExpectedSensors = 3         ; Expect exactly 3 sensors
@@ -269,7 +269,7 @@ MQTT_Topic = enclosure/temperature
 
 ```ini
 [GPIO]
-IO3 = onewire              ; 3 sensors on same bus *
+IO3 = onewire              ; * 3 sensors on same bus
 
 [DS18B20]
 ExpectedSensors = 3         ; Validate all 3 detected
