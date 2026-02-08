@@ -714,6 +714,12 @@ void SensorDS18B20::publishInfluxDB()
         return;
     }
     
+    // Check if InfluxDB is configured with a valid URI before attempting to publish
+    if (!influxDB.isConfigured()) {
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "InfluxDB not configured, skipping publish");
+        return;
+    }
+    
     time_t now = time(nullptr);
     
     for (size_t i = 0; i < _temperatures.size(); i++) {
