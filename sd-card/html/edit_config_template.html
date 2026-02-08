@@ -1555,6 +1555,15 @@
         </tr>
 
         <tr class="DS18B20Item">
+            <td class="indent1">Expected Sensor Count</td>
+            <td>
+                <input type="number" id="DS18B20_ExpectedSensors_value1" min="-1" step="1" value="-1">
+                <span style="font-size: 0.9em; color: #666;">(-1 = auto-detect, >0 = validate count with retry)</span>
+            </td>
+            <td>$TOOLTIP_DS18B20_ExpectedSensors</td>
+        </tr>
+
+        <tr class="DS18B20Item">
             <td class="indent1">Read Interval (seconds)</td>
             <td>
                 <input type="number" id="DS18B20_Interval_value1" min="-1" step="1" value="-1">
@@ -2600,6 +2609,7 @@ function UpdateInput() {
     WriteParameter(param, category, "SHT3x", "InfluxDB_Enable", false);
     WriteParameter(param, category, "SHT3x", "InfluxDB_Measurement", false);
 
+    WriteParameter(param, category, "DS18B20", "ExpectedSensors", false);
     WriteParameter(param, category, "DS18B20", "Interval", false);
     WriteParameter(param, category, "DS18B20", "MQTT_Enable", false);
     WriteParameter(param, category, "DS18B20", "MQTT_Topic", false);
@@ -2793,6 +2803,7 @@ function ReadParameterAll() {
     ReadParameter(param, "SHT3x", "InfluxDB_Enable", false);
     ReadParameter(param, "SHT3x", "InfluxDB_Measurement", false);
 
+    ReadParameter(param, "DS18B20", "ExpectedSensors", false);
     ReadParameter(param, "DS18B20", "Interval", false);
     ReadParameter(param, "DS18B20", "MQTT_Enable", false);
     ReadParameter(param, "DS18B20", "MQTT_Topic", false);

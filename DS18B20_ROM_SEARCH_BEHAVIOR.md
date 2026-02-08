@@ -11,6 +11,9 @@
 When the device boots and initializes sensors, the following happens:
 
 1. **ROM Search Algorithm Executes** - Scans the 1-Wire bus for all DS18B20 devices
+   - **Retry Logic**: Up to 5 attempts if expected sensor count is not found
+   - **Expected Sensor Validation**: If `ExpectedSensors` is configured, validates the count
+   - **Best Result Fallback**: Uses the attempt with the most sensors detected if expected count not reached
 2. **ROM IDs Are Cached** - All discovered sensor ROM IDs are stored in memory
 3. **Initial Temperatures Read** - Each sensor is read once to verify it works
 4. **Cached List Used Forever** - This list is used for all future reads until restart
@@ -26,12 +29,15 @@ When the sensor manager calls `readData()`:
 
 ## Example Log Output
 
-Here's what you'll see in the logs:
+### Auto-Detect Mode (Default)
+
+Here's what you'll see in the logs when `ExpectedSensors` is not set (auto-detect):
 
 ```
 [INFO] DS18B20: Initializing DS18B20 sensor on GPIO12
 [INFO] DS18B20: === DS18B20 ROM Search (startup only) ===
 [INFO] DS18B20: Scanning 1-Wire bus for DS18B20 devices...
+[INFO] DS18B20: ROM search found 3 sensor(s) on retry 1
 [INFO] DS18B20: ROM search complete: Found 3 DS18B20 sensor(s)
 [INFO] DS18B20: Discovered ROM IDs (will be used for all future reads):
 [INFO] DS18B20:   Sensor #1: 28-0123456789AB
@@ -43,6 +49,51 @@ Here's what you'll see in the logs:
 [INFO] DS18B20:   Sensor #3 initial temp: 12.8°C
 [INFO] DS18B20: === DS18B20 initialization complete ===
 [INFO] DS18B20: Future reads will use these 3 cached sensor(s) without re-scanning
+```
+
+### Expected Sensor Count Mode
+
+When `ExpectedSensors = 3` is configured and all sensors are found:
+
+```
+[INFO] DS18B20: Initializing DS18B20 sensor on GPIO12
+[INFO] DS18B20: Expected sensor count: 3
+[INFO] DS18B20: === DS18B20 ROM Search (startup only) ===
+[INFO] DS18B20: Scanning 1-Wire bus for DS18B20 devices...
+[INFO] DS18B20: ROM search found expected 3 sensor(s) on retry 1
+[INFO] DS18B20: ROM search complete: Found 3 DS18B20 sensor(s)
+[INFO] DS18B20: Discovered ROM IDs (will be used for all future reads):
+[INFO] DS18B20:   Sensor #1: 28-0123456789AB
+[INFO] DS18B20:   Sensor #2: 28-FEDCBA987654
+[INFO] DS18B20:   Sensor #3: 28-AABBCCDD1122
+[INFO] DS18B20: === DS18B20 initialization complete ===
+```
+
+When fewer sensors than expected are found (with retry attempts):
+
+```
+[INFO] DS18B20: Initializing DS18B20 sensor on GPIO12
+[INFO] DS18B20: Expected sensor count: 3
+[INFO] DS18B20: === DS18B20 ROM Search (startup only) ===
+[INFO] DS18B20: Scanning 1-Wire bus for DS18B20 devices...
+[WARN] DS18B20: ROM search found 2 sensor(s), expected 3
+[WARN] DS18B20: ROM search retry 2 after 150ms
+[WARN] DS18B20: ROM search found 2 sensor(s), expected 3
+[WARN] DS18B20: ROM search retry 3 after 200ms
+[INFO] DS18B20: ROM search found expected 3 sensor(s) on retry 3
+[INFO] DS18B20: ROM search complete: Found 3 DS18B20 sensor(s)
+```
+
+When expected count is not reached but some sensors are found:
+
+```
+[INFO] DS18B20: Expected sensor count: 3
+[WARN] DS18B20: ROM search found 2 sensor(s), expected 3
+[WARN] DS18B20: ROM search retry 2 after 150ms
+...
+[WARN] DS18B20: Using best ROM search result: 2 sensor(s)
+[WARN] DS18B20: Found 2 sensor(s) but expected 3 - continuing with detected sensors
+[INFO] DS18B20: ROM search complete: Found 2 DS18B20 sensor(s)
 ```
 
 Later during operation (every read cycle):
@@ -59,6 +110,8 @@ Notice: **No ROM search messages during normal reads!**
 
 ### ROM Search (Once at Startup)
 - **Duration**: ~100-200ms per sensor detected
+- **Retry Delays**: 100ms, 150ms, 200ms, 250ms, 300ms (if retries needed)
+- **Maximum Time**: ~2 seconds (5 retries × 300ms + search time)
 - **Frequency**: Once per device boot
 - **Impact**: Negligible (only at startup)
 
@@ -71,6 +124,27 @@ Notice: **No ROM search messages during normal reads!**
 - **Startup**: 2-3 seconds total (includes ROM search + initial reads)
 - **Each Read Cycle**: ~2.4 seconds (800ms × 3 sensors)
 - **No ROM Search Overhead**: Saves ~300-600ms per read cycle
+
+## Configuration
+
+### ExpectedSensors Parameter
+
+In `config.ini`, you can now configure the expected number of sensors:
+
+```ini
+[DS18B20]
+ExpectedSensors = 3  ; -1 = auto-detect (default), >0 = expected sensor count
+```
+
+**When to use:**
+- `-1` (auto-detect): Default behavior, accepts any number of sensors found on first successful scan
+- `>0` (specific count): Validates against expected count, retries up to 5 times if not found
+
+**Benefits:**
+- Detects wiring issues or loose connections during startup
+- Provides early warning if sensors are missing
+- Continues operation with fewer sensors if retry limit reached
+- Improves reliability in environments with electrical interference
 
 ## Hot-Plugging Sensors
 
