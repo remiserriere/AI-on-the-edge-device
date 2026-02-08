@@ -590,13 +590,16 @@ void SensorDS18B20::readTask()
         publishMQTT();
         publishInfluxDB();
         
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task completed successfully");
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 async task finished - clearing handle and exiting");
     } else {
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Background read task failed to read any sensors");
     }
     
     // Clear handle before deleting task to prevent race condition
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "DS18B20 async task setting handle to nullptr (was=" + 
+                        std::to_string((unsigned long)_readTaskHandle) + ")");
     _readTaskHandle = nullptr;
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "DS18B20 async task calling vTaskDelete(NULL)");
     vTaskDelete(NULL);
 }
 
@@ -614,9 +617,12 @@ bool SensorDS18B20::readData()
     // 3. No window where task is active but handle is nullptr
     if (_readTaskHandle != nullptr) {
         // Read still in progress, return false (not complete yet)
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "DS18B20 read skipped: previous read task still in progress");
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20 read skipped: previous read task still in progress (handle=" + 
+                            std::to_string((unsigned long)_readTaskHandle) + ")");
         return false;
     }
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 readData() starting - creating async read task");
     
     // Note: shouldRead() check is done by SensorManager::update() before calling this
     // Start a background task to read sensors asynchronously
@@ -638,7 +644,8 @@ bool SensorDS18B20::readData()
         return false;
     }
     
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 readData() spawned async read task successfully");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 readData() spawned async read task successfully (handle=" + 
+                        std::to_string((unsigned long)_readTaskHandle) + ")");
     
     // Return true to indicate read was initiated
     // The task will complete in background
