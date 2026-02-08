@@ -92,6 +92,35 @@ void SensorBase::sensorTaskWrapper(void* pvParameters)
 
 void SensorBase::sensorTask()
 {
+    // ============================================================================
+    // PERIODIC TASK FOR SENSOR READING (DS18B20, SHT3x, etc.)
+    // ============================================================================
+    // 
+    // This task runs for sensors with custom intervals (not "follow flow" mode).
+    // 
+    // SCHEDULING LOGIC:
+    //   1. Spawn async read task (returns immediately)
+    //   2. Wait for async task to complete (polls isReadInProgress())
+    //   3. Wait configured interval
+    //   4. Repeat
+    // 
+    // This ensures interval is time BETWEEN reads, not overlapping reads.
+    // Works correctly even if read takes longer than interval.
+    // 
+    // FAILPROOF FEATURES:
+    //   - If readData() fails: skips and retries after interval
+    //   - If async task hangs: timeout after 5 minutes, continue anyway
+    //   - vTaskDelay() always executes: next iteration always scheduled
+    //   - No try-catch: uses return values and timeouts
+    // 
+    // POWER EFFICIENCY:
+    //   - Task at tskIDLE_PRIORITY (lowest)
+    //   - vTaskDelay() yields CPU completely
+    //   - Polling uses 100ms delays (not busy wait)
+    // 
+    // USED BY: DS18B20, SHT3x (both inherit from SensorBase)
+    // ============================================================================
+    
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task started (interval: " + 
                         std::to_string(_readInterval) + "s)");
     
@@ -139,19 +168,37 @@ void SensorBase::sensorTask()
         // Wait for async read task to complete before scheduling next iteration
         // This ensures interval is BETWEEN reads, not overlapping reads
         // Use polling with delays (power efficient - yields CPU between checks)
+        // Add timeout to prevent infinite wait if async task crashes
         bool wasWaiting = false;
+        int waitIterations = 0;
+        const int maxWaitIterations = 3000;  // 3000 * 100ms = 5 minutes max wait
+        
         while (isReadInProgress()) {
             if (!wasWaiting) {
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Waiting for async read to complete");
                 wasWaiting = true;
             }
+            
             // Power-efficient: yield CPU while waiting
             // Check every 100ms to be responsive but not wasteful
             vTaskDelay(pdMS_TO_TICKS(100));
+            
+            waitIterations++;
+            if (waitIterations >= maxWaitIterations) {
+                // Timeout: async task took too long or crashed
+                // Log error and continue to next iteration to prevent permanent hang
+                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, 
+                    "Timeout waiting for async read (waited " + 
+                    std::to_string(waitIterations / 10) + "s), continuing anyway");
+                break;  // Exit wait loop, proceed to interval delay
+            }
         }
         
         if (wasWaiting) {
-            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Async read completed, starting interval delay");
+            if (waitIterations < maxWaitIterations) {
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, 
+                    "Async read completed after " + std::to_string(waitIterations / 10) + "s");
+            }
         }
         
         // Now that previous read is complete, wait for the configured interval
