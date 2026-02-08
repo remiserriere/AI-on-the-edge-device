@@ -2821,8 +2821,8 @@ Alternatively you can set the parameter <code>DecimalShift</code> to <code>3</co
 <h4>Configuration Example</h4>
 <p>```ini
 [GPIO]
-IO12 = i2c-sda
-IO13 = i2c-scl</p>
+IO3 = i2c-sda                ; * Requires disabling USB logging
+IO1 = i2c-scl                ; * Requires disabling USB logging</p>
 <p>[SHT3x]
 Enable = true
 Address = 0x44           ; Default address
@@ -3091,8 +3091,8 @@ GROUP BY time(1h)</code></p>
 <h4>Configuration Example</h4>
 <p>```ini
 [GPIO]
-IO12 = i2c-sda
-IO13 = i2c-scl</p>
+IO3 = i2c-sda                ; * Requires disabling USB logging
+IO1 = i2c-scl                ; * Requires disabling USB logging</p>
 <p>[SHT3x]
 Enable = true
 Address = 0x44
@@ -4167,7 +4167,7 @@ ExpectedSensors = -1        ; Auto-detect (default)</code></p>
 <p><strong>Example:</strong>
 ```ini
 [GPIO]
-IO12 = onewire              ; 3 DS18B20 sensors wired in parallel</p>
+IO3 = onewire               ; * Requires disabling USB logging              ; 3 DS18B20 sensors wired in parallel</p>
 <p>[DS18B20]
 ExpectedSensors = 3         ; Expect exactly 3 sensors
 MQTT_Enable = true
@@ -4326,7 +4326,7 @@ Monitor logs for detection issues. If problems occur, switch to exact count.</p>
 <p><strong>Scenario</strong>: Single sensor monitoring enclosure temperature</p>
 <p>```ini
 [GPIO]
-IO12 = onewire</p>
+IO3 = onewire               ; * Requires disabling USB logging</p>
 <p>[DS18B20]
 ExpectedSensors = 1         ; Validate sensor detected
 Interval = -1
@@ -4338,7 +4338,7 @@ MQTT_Topic = enclosure/temperature
 <p><strong>Scenario</strong>: Three sensors (inside, outside, pipe) in outdoor enclosure</p>
 <p>```ini
 [GPIO]
-IO12 = onewire              ; 3 sensors on same bus</p>
+IO3 = onewire               ; * Requires disabling USB logging              ; 3 sensors on same bus</p>
 <p>[DS18B20]
 ExpectedSensors = 3         ; Validate all 3 detected
 Interval = 300              ; Read every 5 minutes
@@ -4352,7 +4352,7 @@ InfluxDB_Measurement = environment
 <p><strong>Scenario</strong>: Experimenting with different sensor configurations</p>
 <p>```ini
 [GPIO]
-IO12 = onewire</p>
+IO3 = onewire               ; * Requires disabling USB logging</p>
 <p>[DS18B20]
 ExpectedSensors = -1        ; Auto-detect whatever is connected
 Interval = -1
@@ -4568,7 +4568,7 @@ Good for: Debugging overheating, tracking cooling system performance</p>
 <p><strong>Goal</strong>: Track inside, outside, and pipe temperatures</p>
 <p>```ini
 [GPIO]
-IO12 = onewire       ; 3 sensors on same wire</p>
+IO3 = onewire               ; * Requires disabling USB logging       ; 3 sensors on same wire</p>
 <p>[DS18B20]
 Enable = true
 Interval = -1        ; Follow flow (e.g., every 10 min)
@@ -4860,7 +4860,7 @@ User = mqtt_user
 Password = mqtt_pass
 MainTopic = watermeter</p>
 <p>[GPIO]
-IO12 = onewire</p>
+IO3 = onewire               ; * Requires disabling USB logging</p>
 <p>[DS18B20]
 Enable = true
 Interval = -1
@@ -5111,7 +5111,7 @@ Password = mqtt_pass
 MainTopic = home/watermeter
 ClientName = watermeter-device</p>
 <p>[GPIO]
-IO12 = onewire</p>
+IO3 = onewire               ; * Requires disabling USB logging</p>
 <p>[DS18B20]
 Enable = true
 Interval = 300
@@ -5413,7 +5413,7 @@ Database = homeautomation
 User = influx_user
 Password = influx_pass</p>
 <p>[GPIO]
-IO12 = onewire</p>
+IO3 = onewire               ; * Requires disabling USB logging</p>
 <p>[DS18B20]
 Enable = true
 Interval = 300        ; Every 5 minutes
@@ -6129,9 +6129,10 @@ By default, it is used for build-in flash light (onboard LED).</p>
                     <!-- <option value="output-pwm">output-pwm</option> -->
                     <!-- <option value="external-flash-pwm">external-flash-pwm</option> -->				
                     <option value="external-flash-ws281x">external flash light ws281x controlled</option>
-                    <option value="i2c-sda">I²C SDA (SHT3x)</option>
-                    <option value="i2c-scl">I²C SCL (SHT3x)</option>
-                    <option value="onewire">1-Wire (DS18B20)</option>
+                    <!-- I2C and 1-Wire options removed from GPIO12 - boot strapping pin conflict with pull-up resistors -->
+                    <!-- <option value="i2c-sda">I²C SDA (SHT3x)</option> -->
+                    <!-- <option value="i2c-scl">I²C SCL (SHT3x)</option> -->
+                    <!-- <option value="onewire">1-Wire (DS18B20)</option> -->
                 </select>
             </td>
             <td>
@@ -6143,9 +6144,28 @@ By default, it is used for build-in flash light (onboard LED).</p>
 <p>This is an <strong>Expert Parameter</strong>! Only change it if you understand what it does!</p>
 </div>
 <p>This parameter can be used to configure the GPIO <code>IO12</code> pin.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This pin is usable without known restrictions!</p>
+<div class="admonition info">
+<p class="admonition-title">GPIO12 Restrictions</p>
+<p><strong>Boot Strapping Pin:</strong> GPIO12 determines flash voltage at boot (LOW=3.3V, HIGH=1.8V).</p>
+<p><strong>Critical Timing Distinction:</strong></p>
+<ul>
+<li>❌ <strong>Hardware pull-ups</strong> (physical resistors) - Pull GPIO12 HIGH <strong>during boot</strong> → boot failure</li>
+<li>✅ <strong>Software pull-ups</strong> (input-pullup mode) - Enabled <strong>after boot</strong> → safe to use</li>
+</ul>
+<p><strong>Not Available for Sensor Modes:</strong></p>
+<ul>
+<li>❌ I²C (i2c-sda, i2c-scl) - requires hardware pull-up resistors → boot failure</li>
+<li>❌ 1-Wire (onewire) - requires hardware pull-up resistor → boot failure</li>
+</ul>
+<p><strong>Available Modes:</strong></p>
+<ul>
+<li>✅ WS2812 LEDs (external-flash-ws281x) - no pull-ups needed, idle LOW, safe</li>
+<li>✅ Basic I/O (input, output, input-pullup*) - software pull-up enabled after boot</li>
+</ul>
+<p>* <strong>input-pullup mode is safe</strong> because ESP32's internal pull-up is configured by software after boot completes, so GPIO12 reads LOW during the boot strapping sample.</p>
+<p><strong>Why sensors fail:</strong> I²C and 1-Wire require physical 4.7kΩ resistors soldered/connected between GPIO12 and 3.3V. These resistors pull GPIO12 HIGH before ESP32 even powers up, causing wrong flash voltage selection at boot.</p>
+<p><strong>Why WS2812 works:</strong> Actively driven data (push-pull), no hardware pull-ups, idle state LOW.</p>
+<p><strong>For sensors:</strong> Use GPIO1 or GPIO3 (requires disabling USB logging).</p>
 </div>
 <p>Parameters:</p>
 <ul>

@@ -367,7 +367,7 @@ User = influx_user
 Password = influx_pass
 
 [GPIO]
-IO12 = onewire
+IO3 = onewire               ; * Requires disabling USB logging
 
 [DS18B20]
 Enable = true

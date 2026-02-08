@@ -320,7 +320,7 @@ MainTopic = home/watermeter
 ClientName = watermeter-device
 
 [GPIO]
-IO12 = onewire
+IO3 = onewire               ; * Requires disabling USB logging
 
 [DS18B20]
 Enable = true
