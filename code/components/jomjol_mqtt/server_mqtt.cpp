@@ -86,7 +86,7 @@ std::string getSensorBaseTopic(const std::string& customTopic, const std::string
 
 bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
     std::string name, std::string icon, std::string unit, std::string deviceClass, std::string stateClass, std::string entityCategory,
-    int qos, std::string customBaseTopic = "") {
+    int qos, std::string discoveryBaseTopic = "") {
     std::string version = std::string(libfive_git_version());
 
     if (version == "") {
@@ -130,16 +130,16 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
      * if the main topic is embedded in a nested structure, we just use the last part as node_id 
      * This means a maintopic "home/test/watermeter" is transformed to the discovery topic "homeassistant/sensor/watermeter/..."
     */
-    std::string discoveryBaseTopic = customBaseTopic.empty() ? maintopic : customBaseTopic;
-    std::string node_id = createNodeId(discoveryBaseTopic);
+    std::string baseTopic = discoveryBaseTopic.empty() ? maintopic : discoveryBaseTopic;
+    std::string node_id = createNodeId(baseTopic);
     topicFull = "homeassistant/" + component + "/" + node_id + "/" + configTopic + "/config";
     
     /* See https://www.home-assistant.io/docs/mqtt/discovery/ */
     payload = string("{")  +
-        "\"~\": \"" + discoveryBaseTopic + "\","  +
-        "\"unique_id\": \"" + discoveryBaseTopic + "-" + configTopic + "\","  +
-        "\"object_id\": \"" + discoveryBaseTopic + "_" + configTopic + "\","  + // Default entity ID; required for HA <= 2025.10
-        "\"default_entity_id\": \"" + component + "." + discoveryBaseTopic + "_" + configTopic + "\"," + // Default entity ID; required in HA >=2026.4
+        "\"~\": \"" + baseTopic + "\","  +
+        "\"unique_id\": \"" + baseTopic + "-" + configTopic + "\","  +
+        "\"object_id\": \"" + baseTopic + "_" + configTopic + "\","  + // Default entity ID; required for HA <= 2025.10
+        "\"default_entity_id\": \"" + component + "." + baseTopic + "_" + configTopic + "\"," + // Default entity ID; required in HA >=2026.4
         "\"name\": \"" + name + "\","  +
         "\"icon\": \"mdi:" + icon + "\",";        
 
@@ -187,8 +187,8 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
         "\"payload_not_available\": \"" + LWT_DISCONNECTED + "\",";
 
     payload += string("\"device\": {")  +
-        "\"identifiers\": [\"" + discoveryBaseTopic + "\"],"  +
-        "\"name\": \"" + discoveryBaseTopic + "\","  +
+        "\"identifiers\": [\"" + baseTopic + "\"],"  +
+        "\"name\": \"" + baseTopic + "\","  +
         "\"model\": \"Meter Digitizer\","  +
         "\"manufacturer\": \"AI on the Edge Device\","  +
       "\"sw_version\": \"" + version + "\","  +
