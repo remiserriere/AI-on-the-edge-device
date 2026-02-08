@@ -194,9 +194,14 @@ bool SensorBase::startPeriodicTask()
 void SensorBase::stopPeriodicTask()
 {
     if (_taskHandle != nullptr) {
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Stopping periodic task for sensor: " + getName());
-        vTaskDelete(_taskHandle);
-        _taskHandle = nullptr;
+        TaskHandle_t taskToDelete = _taskHandle;
+        _taskHandle = nullptr;  // Clear handle first to prevent double-delete
+        
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Stopping periodic task");
+        vTaskDelete(taskToDelete);
+        
+        // Give scheduler time to actually delete the task
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
