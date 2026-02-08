@@ -24,11 +24,13 @@ Configure a GPIO pin as `i2c-sda` when you want to:
 - GPIO12 LOW at boot = 3.3V flash voltage (standard)
 - GPIO12 HIGH at boot = 1.8V flash voltage (rare)
 
-When using GPIO12 with I²C sensors requiring pull-up resistors, the pull-up holds GPIO12 HIGH during boot, causing the ESP32 to switch to 1.8V flash mode and **preventing the device from booting completely** on standard 3.3V flash modules.
+**The Problem:** I²C sensors require **hardware pull-up resistors** (typically 4.7kΩ physical resistors soldered between GPIO12 and 3.3V). These resistors pull GPIO12 HIGH **before and during boot**, causing the ESP32 to switch to 1.8V flash mode and **preventing the device from booting completely** on standard 3.3V flash modules.
 
 **Symptom:** ESP32 does not boot when sensor is connected, boots fine when disconnected.
 
-> **💡 Note:** GPIO12 CAN be used for WS2812 LEDs (which don't use pull-up resistors), but NOT for I²C or 1-Wire sensors. See [IO12 documentation](IO12.md#exception-ws2812-leds-are-safe-on-gpio12) for technical explanation.
+**Important Note:** Software pull-ups (configured after boot) are safe on GPIO12 for basic I/O, but I²C/1-Wire protocols require physical hardware pull-up resistors that are active during boot, which causes the failure.
+
+> **💡 Note:** GPIO12 CAN be used for WS2812 LEDs (which don't use pull-up resistors), but NOT for I²C or 1-Wire sensors. See [IO12 documentation](IO12.md) for technical explanation.
 
 ## Compatible GPIO Pins
 

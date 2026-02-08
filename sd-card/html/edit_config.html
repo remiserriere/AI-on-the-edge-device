@@ -6129,9 +6129,10 @@ By default, it is used for build-in flash light (onboard LED).</p>
                     <!-- <option value="output-pwm">output-pwm</option> -->
                     <!-- <option value="external-flash-pwm">external-flash-pwm</option> -->				
                     <option value="external-flash-ws281x">external flash light ws281x controlled</option>
-                    <option value="i2c-sda">I²C SDA (SHT3x)</option>
-                    <option value="i2c-scl">I²C SCL (SHT3x)</option>
-                    <option value="onewire">1-Wire (DS18B20)</option>
+                    <!-- I2C and 1-Wire options removed from GPIO12 - boot strapping pin conflict with pull-up resistors -->
+                    <!-- <option value="i2c-sda">I²C SDA (SHT3x)</option> -->
+                    <!-- <option value="i2c-scl">I²C SCL (SHT3x)</option> -->
+                    <!-- <option value="onewire">1-Wire (DS18B20)</option> -->
                 </select>
             </td>
             <td>

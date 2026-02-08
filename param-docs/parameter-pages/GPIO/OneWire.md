@@ -10,7 +10,7 @@ Configure a GPIO pin for 1-Wire protocol used by DS18B20 temperature sensors.
 - GPIO12 LOW at boot = 3.3V flash voltage (standard)
 - GPIO12 HIGH at boot = 1.8V flash voltage (rare)
 
-When using GPIO12 with DS18B20 sensors requiring a 4.7kΩ pull-up resistor, the pull-up holds GPIO12 HIGH during boot, causing the ESP32 to switch to 1.8V flash mode and **preventing the device from booting completely** on standard 3.3V flash modules.
+**The Problem:** DS18B20 sensors require a **hardware pull-up resistor** (typically 4.7kΩ physical resistor soldered between GPIO12 and 3.3V). This resistor pulls GPIO12 HIGH **before and during boot**, causing the ESP32 to switch to 1.8V flash mode and **preventing the device from booting completely** on standard 3.3V flash modules.
 
 **Symptom:** ESP32 does not boot when sensor is connected, boots fine when disconnected.
 
@@ -22,7 +22,9 @@ ets_main.c
 ```
 This indicates GPIO12 strapping pin conflict.
 
-> **💡 Note:** GPIO12 CAN be used for WS2812 LEDs (which don't use pull-up resistors), but NOT for I²C or 1-Wire sensors. See [IO12 documentation](IO12.md#exception-ws2812-leds-are-safe-on-gpio12) for technical explanation.
+**Important Note:** Software pull-ups (configured after boot) are safe on GPIO12 for basic I/O, but 1-Wire protocol requires a physical hardware pull-up resistor that is active during boot, which causes the failure.
+
+> **💡 Note:** GPIO12 CAN be used for WS2812 LEDs (which don't use pull-up resistors), but NOT for I²C or 1-Wire sensors. See [IO12 documentation](IO12.md) for technical explanation.
 
 ## Value
 Select `onewire` from the GPIO mode dropdown.

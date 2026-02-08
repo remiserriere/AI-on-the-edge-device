@@ -1,30 +1,18 @@
 # Parameter `LEDType`
 Default Value: `WS2812`
 
-Type of the `WS2812x` addressable RGB LED which is connected to GPIO12 (See `IO12` parameter).
+Type of WS2812x addressable RGB LED connected to GPIO12.
 
-## Supported LED Types
+## Supported Types
 
-- **WS2812** - Original WS2812 LEDs (default)
-- **WS2812B** - Improved WS2812B variant (most common)
-- **WS2812B_NEWVARIANT** - Newer WS2812B with different timing
-- **WS2812B_OLDVARIANT** - Older WS2812B timing
+- **WS2812** - Original (default)
+- **WS2812B** - Most common variant
+- **WS2812B_NEWVARIANT** - Newer timing
+- **WS2812B_OLDVARIANT** - Older timing
 - **WS2812C** - WS2812C variant
 
-## Why GPIO12 is Safe for WS2812 LEDs
+## GPIO12 Compatibility
 
-**Important:** While GPIO12 cannot be used for I²C or 1-Wire sensors (due to boot strapping pin conflict with pull-up resistors), **WS2812 LEDs are perfectly safe on GPIO12**.
+WS2812 LEDs work on GPIO12 (unlike I²C/1-Wire sensors) because they use actively driven data (no pull-up resistors), so idle state is LOW and doesn't affect boot strapping.
 
-### Technical Reason
-
-- **WS2812 uses NO pull-up resistors** - Data line is actively driven (push-pull)
-- **Idle state is LOW** - When unpowered, data line does NOT pull GPIO12 HIGH
-- **Boot behavior** - GPIO12 reads LOW at boot → 3.3V flash mode → normal boot ✅
-
-This is why the original design specifically chose GPIO12 for WS2812 external flash LEDs.
-
-See [IO12 Parameter Documentation](IO12.md#exception-ws2812-leds-are-safe-on-gpio12) for complete technical explanation.
-
-## Configuration
-
-Set this parameter to match your specific LED type for optimal timing and compatibility.
+See [IO12](IO12.md) and [LEDColor](LEDColor.md) for details.
