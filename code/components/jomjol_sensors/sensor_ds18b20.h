@@ -67,7 +67,7 @@ public:
      * @brief Check if a read operation is currently in progress
      * @return true if reading
      */
-    bool isReadInProgress() const { return _readTaskHandle != nullptr; }
+    bool isReadInProgress() const override { return _readTaskHandle != nullptr; }
     
 private:
     std::vector<float> _temperatures;

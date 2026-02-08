@@ -501,7 +501,10 @@ void SensorDS18B20::readTaskWrapper(void* pvParameters)
 
 void SensorDS18B20::readTask()
 {
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task started");
+    // Use tick-based timing instead of time() which returns epoch (1970) on cold boot before NTP sync
+    TickType_t taskStartTicks = xTaskGetTickCount();
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 background read task started for " + 
+                        std::to_string(_romIds.size()) + " sensor(s)");
     
     // Read all sensors with retry logic
     const int maxRetries = 5;  // Increased from 3 to 5 for better transient error handling
@@ -580,26 +583,45 @@ void SensorDS18B20::readTask()
     
     _readSuccess = anySuccess;
     
+    // Calculate task duration using ticks (works even when time() returns epoch on cold boot)
+    TickType_t taskEndTicks = xTaskGetTickCount();
+    TickType_t taskDurationTicks = taskEndTicks - taskStartTicks;
+    int taskDurationSeconds = taskDurationTicks / configTICK_RATE_HZ;
+    
     if (anySuccess) {
+        // Update last read time using time(nullptr) for consistency with shouldRead()
+        // Note: On cold boot before NTP, this is seconds since boot, which is fine for interval checking
         _lastRead = time(nullptr);
+        
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 read completed successfully in " + 
+                            std::to_string(taskDurationSeconds) + "s, publishing data");
         
         // Publish data from background task after successful read
         publishMQTT();
         publishInfluxDB();
         
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task completed successfully");
+        // Calculate total time including publishing
+        TickType_t totalTicks = xTaskGetTickCount() - taskStartTicks;
+        int totalSeconds = totalTicks / configTICK_RATE_HZ;
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 async task finished - clearing handle and exiting (total time: " + 
+                            std::to_string(totalSeconds) + "s)");
     } else {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Background read task failed to read any sensors");
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Background read task failed to read any sensors after " + 
+                            std::to_string(taskDurationSeconds) + "s");
     }
     
     // Clear handle before deleting task to prevent race condition
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "DS18B20 async task setting handle to nullptr (was=" + 
+                        std::to_string((unsigned long)_readTaskHandle) + ")");
     _readTaskHandle = nullptr;
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "DS18B20 async task calling vTaskDelete(NULL)");
     vTaskDelete(NULL);
 }
 
 bool SensorDS18B20::readData()
 {
     if (!_initialized) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Cannot read DS18B20: sensor not initialized");
         return false;
     }
     
@@ -610,8 +632,12 @@ bool SensorDS18B20::readData()
     // 3. No window where task is active but handle is nullptr
     if (_readTaskHandle != nullptr) {
         // Read still in progress, return false (not complete yet)
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20 read skipped: previous read task still in progress (handle=" + 
+                            std::to_string((unsigned long)_readTaskHandle) + ")");
         return false;
     }
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 readData() starting - creating async read task");
     
     // Note: shouldRead() check is done by SensorManager::update() before calling this
     // Start a background task to read sensors asynchronously
@@ -633,7 +659,8 @@ bool SensorDS18B20::readData()
         return false;
     }
     
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Started background read task (true async)");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 readData() spawned async read task successfully (handle=" + 
+                        std::to_string((unsigned long)_readTaskHandle) + ")");
     
     // Return true to indicate read was initiated
     // The task will complete in background
@@ -679,9 +706,23 @@ int SensorDS18B20::scanDevices()
 void SensorDS18B20::publishMQTT()
 {
 #ifdef ENABLE_MQTT
-    if (!_mqttEnabled || !getMQTTisConnected()) {
+    if (!_mqttEnabled) {
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "MQTT publishing disabled for DS18B20");
         return;
     }
+    
+    if (!getMQTTisConnected()) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Cannot publish DS18B20 to MQTT: not connected");
+        return;
+    }
+    
+    if (_temperatures.empty()) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Cannot publish DS18B20 to MQTT: no sensor data");
+        return;
+    }
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Publishing " + std::to_string(_temperatures.size()) + 
+                        " DS18B20 sensor(s) to MQTT");
     
     for (size_t i = 0; i < _temperatures.size(); i++) {
         // Determine base topic: use main topic if config topic is empty, otherwise use config topic
@@ -704,6 +745,8 @@ void SensorDS18B20::publishMQTT()
         
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to MQTT: " + topic + " = " + value);
     }
+#else
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "MQTT not compiled in (ENABLE_MQTT not defined)");
 #endif
 }
 
@@ -717,9 +760,9 @@ void SensorDS18B20::publishInfluxDB()
     time_t now = time(nullptr);
     
     for (size_t i = 0; i < _temperatures.size(); i++) {
-        // Include sensor type and ROM ID in field name for identification
+        // Include ROM ID in field name for sensor identification
         std::string romIdStr = getRomId(i);
-        std::string field = "ds18b20_" + romIdStr + "_temperature";
+        std::string field = "temperature_" + romIdStr;
         
         influxDB.InfluxDBPublish(_influxMeasurement, 
                                  field, 
