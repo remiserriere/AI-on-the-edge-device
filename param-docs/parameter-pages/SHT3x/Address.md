@@ -44,9 +44,9 @@ This is useful for:
    - One pin set to **`i2c-scl`** (e.g., IO1) *
 5. Save configuration and restart
 
-**CRITICAL**: Do NOT use GPIO12 for I²C! It's a boot strapping pin that will prevent the device from booting when sensors with pull-up resistors are connected.
-
 \* Requires disabling USB serial logging
+
+**Note:** GPIO12 is not available for I²C in the configuration UI (boot strapping pin).
 
 See detailed guides:
 - [GPIO I²C SDA Configuration](../GPIO/I2C-SDA.md)
@@ -62,7 +62,7 @@ After GPIO configuration, wire the sensor:
 - SCL → Configured SCL GPIO (e.g., IO1) *
 - Add 4.7kΩ pull-up resistors on both SDA and SCL lines
 
-\* Requires disabling USB serial logging. **DO NOT use GPIO12** - it's a boot strapping pin that will prevent boot!
+\* Requires disabling USB serial logging
 
 ## Configuration Example
 

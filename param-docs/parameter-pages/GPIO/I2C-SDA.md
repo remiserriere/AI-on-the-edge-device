@@ -18,19 +18,11 @@ Configure a GPIO pin as `i2c-sda` when you want to:
 
 **Next Step**: After configuring both SDA and SCL GPIO pins, go to the [SHT3x] configuration section and set `Enable = true`.
 
-## ⚠️ CRITICAL: GPIO12 Boot Strapping Pin Conflict
+## GPIO12 Not Available
 
-**DO NOT use GPIO12 for I²C SDA!** GPIO12 is a critical strapping pin that determines flash voltage at boot:
-- GPIO12 LOW at boot = 3.3V flash voltage (standard)
-- GPIO12 HIGH at boot = 1.8V flash voltage (rare)
+**Note:** GPIO12 is not available for I²C SDA in the configuration UI. This is a boot strapping pin that requires GPIO12 to be LOW at boot for standard 3.3V flash. I²C sensors need hardware pull-up resistors that hold GPIO12 HIGH during boot, causing boot failure.
 
-**The Problem:** I²C sensors require **hardware pull-up resistors** (typically 4.7kΩ physical resistors soldered between GPIO12 and 3.3V). These resistors pull GPIO12 HIGH **before and during boot**, causing the ESP32 to switch to 1.8V flash mode and **preventing the device from booting completely** on standard 3.3V flash modules.
-
-**Symptom:** ESP32 does not boot when sensor is connected, boots fine when disconnected.
-
-**Important Note:** Software pull-ups (configured after boot) are safe on GPIO12 for basic I/O, but I²C/1-Wire protocols require physical hardware pull-up resistors that are active during boot, which causes the failure.
-
-> **💡 Note:** GPIO12 CAN be used for WS2812 LEDs (which don't use pull-up resistors), but NOT for I²C or 1-Wire sensors. See [IO12 documentation](IO12.md) for technical explanation.
+**Use GPIO1 or GPIO3 instead** (requires disabling USB logging). See [IO12 documentation](IO12.md) for technical details on why WS2812 LEDs work but I²C sensors don't.
 
 ## Compatible GPIO Pins
 

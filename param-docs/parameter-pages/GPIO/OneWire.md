@@ -4,27 +4,11 @@ Configure a GPIO pin for 1-Wire protocol used by DS18B20 temperature sensors.
 
 > **📍 Configuration Context**: This GPIO setting is part of the **advanced/expert settings** in the web UI. You need to configure this **before** enabling DS18B20 sensors. See [DS18B20 Enable](../DS18B20/Enable.md) for complete setup instructions.
 
-## ⚠️ CRITICAL: GPIO12 Boot Strapping Pin Conflict
+## GPIO12 Not Available
 
-**DO NOT use GPIO12 for 1-Wire (OneWire)!** GPIO12 is a critical strapping pin that determines flash voltage at boot:
-- GPIO12 LOW at boot = 3.3V flash voltage (standard)
-- GPIO12 HIGH at boot = 1.8V flash voltage (rare)
+**Note:** GPIO12 is not available for 1-Wire in the configuration UI. This is a boot strapping pin that requires GPIO12 to be LOW at boot for standard 3.3V flash. 1-Wire sensors need a hardware pull-up resistor that holds GPIO12 HIGH during boot, causing boot failure.
 
-**The Problem:** DS18B20 sensors require a **hardware pull-up resistor** (typically 4.7kΩ physical resistor soldered between GPIO12 and 3.3V). This resistor pulls GPIO12 HIGH **before and during boot**, causing the ESP32 to switch to 1.8V flash mode and **preventing the device from booting completely** on standard 3.3V flash modules.
-
-**Symptom:** ESP32 does not boot when sensor is connected, boots fine when disconnected.
-
-**Boot Error Logs:**
-If you see errors like:
-```
-invalid header: 0xffffffff
-ets_main.c
-```
-This indicates GPIO12 strapping pin conflict.
-
-**Important Note:** Software pull-ups (configured after boot) are safe on GPIO12 for basic I/O, but 1-Wire protocol requires a physical hardware pull-up resistor that is active during boot, which causes the failure.
-
-> **💡 Note:** GPIO12 CAN be used for WS2812 LEDs (which don't use pull-up resistors), but NOT for I²C or 1-Wire sensors. See [IO12 documentation](IO12.md) for technical explanation.
+**Use GPIO3 or GPIO1 instead** (requires disabling USB logging). See [IO12 documentation](IO12.md) for technical details on why WS2812 LEDs work but 1-Wire sensors don't.
 
 ## Value
 Select `onewire` from the GPIO mode dropdown.

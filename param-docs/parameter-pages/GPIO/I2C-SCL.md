@@ -18,13 +18,11 @@ Configure a GPIO pin as `i2c-scl` when you want to:
 
 **Next Step**: After configuring both SDA and SCL GPIO pins, go to the [SHT3x] configuration section and set `Enable = true`.
 
-## ⚠️ CRITICAL: GPIO12 Boot Strapping Pin Conflict
+## GPIO12 Not Available
 
-**DO NOT use GPIO12 for I²C SCL!** GPIO12 is a critical strapping pin that determines flash voltage at boot. When using GPIO12 with I²C sensors requiring pull-up resistors, the pull-up holds GPIO12 HIGH during boot, causing the ESP32 to switch to 1.8V flash mode and **preventing the device from booting completely**.
+**Note:** GPIO12 is not available for I²C SCL in the configuration UI (boot strapping pin conflict with hardware pull-up resistors).
 
-**Symptom:** ESP32 does not boot when sensor is connected, boots fine when disconnected.
-
-See [GPIO12 Strapping Pin Issue](I2C-SDA.md#critical-gpio12-boot-strapping-pin-conflict) for full details.
+**Use GPIO1 or GPIO3 instead** (requires disabling USB logging). See [I2C-SDA.md](I2C-SDA.md) for details.
 
 ## Compatible GPIO Pins
 
