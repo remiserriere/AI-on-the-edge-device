@@ -1457,12 +1457,14 @@
                     <ol style="margin: 5px 0; padding-left: 20px;">
                         <li>Scroll down to the <strong>GPIO</strong> section below</li>
                         <li>Click <strong>"Show Expert Parameters"</strong> checkbox to reveal GPIO settings</li>
-                        <li>Set one GPIO pin to <strong>i2c-sda</strong> (e.g., IO12)</li>
-                        <li>Set another GPIO pin to <strong>i2c-scl</strong> (e.g., IO13)</li>
+                        <li>Set one GPIO pin to <strong>i2c-sda</strong> (e.g., IO3) *</li>
+                        <li>Set another GPIO pin to <strong>i2c-scl</strong> (e.g., IO1) *</li>
                         <li>Save configuration and restart device</li>
                         <li>Then return here to enable and configure the SHT3x sensor</li>
                     </ol>
-                    See <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/Sensors-Overview/" target="_blank">Sensors Overview Documentation</a> for detailed wiring and setup instructions.
+                    <strong style="color: #d32f2f;">⚠️ CRITICAL: DO NOT use GPIO12 for I²C - it's a boot strapping pin that will prevent boot!</strong>
+                    <br>* Requires disabling USB serial logging
+                    <br>See <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/Sensors-Overview/" target="_blank">Sensors Overview Documentation</a> for detailed wiring and setup instructions.
                 </div>
             </td>
         </tr>
@@ -1545,11 +1547,13 @@
                     <ol style="margin: 5px 0; padding-left: 20px;">
                         <li>Scroll down to the <strong>GPIO</strong> section below</li>
                         <li>Click <strong>"Show Expert Parameters"</strong> checkbox to reveal GPIO settings</li>
-                        <li>Set one GPIO pin to <strong>onewire</strong> (e.g., IO12)</li>
+                        <li>Set one GPIO pin to <strong>onewire</strong> (e.g., IO3) *</li>
                         <li>Save configuration and restart device</li>
                         <li>Then return here to enable and configure the DS18B20 sensor</li>
                     </ol>
-                    See <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/Sensors-Overview/" target="_blank">Sensors Overview Documentation</a> for detailed wiring and setup instructions.
+                    <strong style="color: #d32f2f;">⚠️ CRITICAL: DO NOT use GPIO12 for 1-Wire - it's a boot strapping pin that will prevent boot!</strong>
+                    <br>* Requires disabling USB serial logging
+                    <br>See <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/Sensors-Overview/" target="_blank">Sensors Overview Documentation</a> for detailed wiring and setup instructions.
                 </div>
             </td>
         </tr>
@@ -1609,6 +1613,27 @@
             <td colspan="3" style="padding-left: 0px; padding-bottom: 3px;">
                 <h4><input type="checkbox" id="Category_GPIO_enabled" value="1"  onclick='UpdateAfterCategoryCheck()' unchecked > 
                 <label for=Category_GPIO_enabled>GPIO (General Purpose Input / Output)</label></h4>
+            </td>
+        </tr>
+
+        <!------------- GPIO12 CRITICAL WARNING ------------------>
+        <tr class="GPIO_item expert">
+            <td colspan="3">
+                <div style="background-color: #ffebee; border-left: 4px solid #f44336; padding: 10px; margin: 10px 0;">
+                    <strong>⚠️ CRITICAL: GPIO12 Boot Strapping Pin Conflict</strong><br>
+                    <strong>DO NOT use GPIO12 for sensors with pull-up resistors (I²C, 1-Wire)!</strong>
+                    <br><br>
+                    GPIO12 is a strapping pin that determines flash voltage at boot. When a sensor with a pull-up resistor 
+                    is connected to GPIO12, it will pull the pin HIGH during boot, causing the ESP32 to enter 1.8V flash mode 
+                    and <strong>preventing the device from booting completely</strong>.
+                    <br><br>
+                    <strong>Recommended pins:</strong>
+                    <ul style="margin: 5px 0;">
+                        <li><strong>GPIO1 and GPIO3</strong> (requires disabling USB serial logging)</li>
+                        <li><strong>GPIO13</strong> (use with caution - may conflict with SD card)</li>
+                    </ul>
+                    See documentation for details: <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/GPIO/" target="_blank">GPIO Configuration Guide</a>
+                </div>
             </td>
         </tr>
 
@@ -1930,12 +1955,20 @@
                     <!-- <option value="output-pwm">output-pwm</option> -->
                     <!-- <option value="external-flash-pwm">external-flash-pwm</option> -->				
                     <option value="external-flash-ws281x">external flash light ws281x controlled</option>
-                    <option value="i2c-sda">I²C SDA (SHT3x)</option>
-                    <option value="i2c-scl">I²C SCL (SHT3x)</option>
-                    <option value="onewire">1-Wire (DS18B20)</option>
+                    <option value="i2c-sda">⚠️ I²C SDA (NOT GPIO12!)</option>
+                    <option value="i2c-scl">⚠️ I²C SCL (NOT GPIO12!)</option>
+                    <option value="onewire">⚠️ 1-Wire (NOT GPIO12!)</option>
                 </select>
             </td>
-            <td>$TOOLTIP_GPIO_IO12</td>
+            <td>
+                <div style="max-width: 300px; font-size: 0.9em;">
+                    <strong style="color: #d32f2f;">⚠️ CRITICAL WARNING:</strong> GPIO12 is a boot strapping pin!<br>
+                    <strong>DO NOT use for I²C SDA, I²C SCL, or 1-Wire modes!</strong><br><br>
+                    The pull-up resistor required by these sensor modes will hold GPIO12 HIGH during boot, 
+                    causing the ESP32 to enter 1.8V flash mode and preventing boot on standard 3.3V flash modules.<br><br>
+                    <strong>Use GPIO1 or GPIO3 instead</strong> (requires disabling USB logging).
+                </div>
+            </td>
         </tr>
 
         <tr class="GPIO_IO12 GPIO_item expert">
