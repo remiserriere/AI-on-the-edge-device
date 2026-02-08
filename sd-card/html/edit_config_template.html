@@ -1462,8 +1462,7 @@
                         <li>Save configuration and restart device</li>
                         <li>Then return here to enable and configure the SHT3x sensor</li>
                     </ol>
-                    <strong style="color: #d32f2f;">⚠️ CRITICAL: DO NOT use GPIO12 for I²C - it's a boot strapping pin that will prevent boot!</strong>
-                    <br>* Requires disabling USB serial logging
+                    * Requires disabling USB serial logging
                     <br>See <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/Sensors-Overview/" target="_blank">Sensors Overview Documentation</a> for detailed wiring and setup instructions.
                 </div>
             </td>
@@ -1551,8 +1550,7 @@
                         <li>Save configuration and restart device</li>
                         <li>Then return here to enable and configure the DS18B20 sensor</li>
                     </ol>
-                    <strong style="color: #d32f2f;">⚠️ CRITICAL: DO NOT use GPIO12 for 1-Wire - it's a boot strapping pin that will prevent boot!</strong>
-                    <br>* Requires disabling USB serial logging
+                    * Requires disabling USB serial logging
                     <br>See <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/Sensors-Overview/" target="_blank">Sensors Overview Documentation</a> for detailed wiring and setup instructions.
                 </div>
             </td>
@@ -1952,15 +1950,7 @@
                     <!-- <option value="onewire">1-Wire (DS18B20)</option> -->
                 </select>
             </td>
-            <td>
-                <div style="max-width: 300px; font-size: 0.9em;">
-                    <strong>GPIO12 Usage:</strong><br>
-                    ✅ Safe: WS2812 LEDs, basic I/O (including software pullup after boot)<br>
-                    ❌ Not available: I²C, 1-Wire<br><br>
-                    <strong>Why:</strong> Boot strapping pin. Hardware pull-up resistors (needed for I²C/1-Wire) pull GPIO12 HIGH during boot → boot failure.<br><br>
-                    Software pull-up (input-pullup mode) is safe - enabled after boot.
-                </div>
-            </td>
+            <td>$TOOLTIP_GPIO_IO12</td>
         </tr>
 
         <tr class="GPIO_IO12 GPIO_item expert">

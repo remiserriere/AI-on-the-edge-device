@@ -6144,9 +6144,28 @@ By default, it is used for build-in flash light (onboard LED).</p>
 <p>This is an <strong>Expert Parameter</strong>! Only change it if you understand what it does!</p>
 </div>
 <p>This parameter can be used to configure the GPIO <code>IO12</code> pin.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This pin is usable without known restrictions!</p>
+<div class="admonition info">
+<p class="admonition-title">GPIO12 Restrictions</p>
+<p><strong>Boot Strapping Pin:</strong> GPIO12 determines flash voltage at boot (LOW=3.3V, HIGH=1.8V).</p>
+<p><strong>Critical Timing Distinction:</strong></p>
+<ul>
+<li>❌ <strong>Hardware pull-ups</strong> (physical resistors) - Pull GPIO12 HIGH <strong>during boot</strong> → boot failure</li>
+<li>✅ <strong>Software pull-ups</strong> (input-pullup mode) - Enabled <strong>after boot</strong> → safe to use</li>
+</ul>
+<p><strong>Not Available for Sensor Modes:</strong></p>
+<ul>
+<li>❌ I²C (i2c-sda, i2c-scl) - requires hardware pull-up resistors → boot failure</li>
+<li>❌ 1-Wire (onewire) - requires hardware pull-up resistor → boot failure</li>
+</ul>
+<p><strong>Available Modes:</strong></p>
+<ul>
+<li>✅ WS2812 LEDs (external-flash-ws281x) - no pull-ups needed, idle LOW, safe</li>
+<li>✅ Basic I/O (input, output, input-pullup*) - software pull-up enabled after boot</li>
+</ul>
+<p>* <strong>input-pullup mode is safe</strong> because ESP32's internal pull-up is configured by software after boot completes, so GPIO12 reads LOW during the boot strapping sample.</p>
+<p><strong>Why sensors fail:</strong> I²C and 1-Wire require physical 4.7kΩ resistors soldered/connected between GPIO12 and 3.3V. These resistors pull GPIO12 HIGH before ESP32 even powers up, causing wrong flash voltage selection at boot.</p>
+<p><strong>Why WS2812 works:</strong> Actively driven data (push-pull), no hardware pull-ups, idle state LOW.</p>
+<p><strong>For sensors:</strong> Use GPIO1 or GPIO3 (requires disabling USB logging).</p>
 </div>
 <p>Parameters:</p>
 <ul>
