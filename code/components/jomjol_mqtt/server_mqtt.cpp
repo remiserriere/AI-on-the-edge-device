@@ -264,8 +264,8 @@ bool MQTThomeassistantDiscovery(int qos) {
                     std::string romId = ds18b20->getRomId(i);
                     
                     // Create discovery topic for each DS18B20 sensor
-                    // Using ROM ID as unique identifier
-                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(romId, "temperature",
+                    // Using "ds18b20/ROM_ID" as group to match the MQTT topic structure
+                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("ds18b20/" + romId, "temperature",
                         "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos);
                 }
             }

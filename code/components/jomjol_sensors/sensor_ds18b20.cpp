@@ -689,7 +689,8 @@ void SensorDS18B20::publishMQTT()
         // used by other components (e.g., ClassFlowControll, server_GPIO) that call mqttServer_getMainTopic()
         std::string baseTopic;
         if (_mqttTopic.empty()) {
-            baseTopic = mqttServer_getMainTopic();
+            // Use main topic with "ds18b20" subfolder for consistency with SHT3x pattern
+            baseTopic = mqttServer_getMainTopic() + "/ds18b20";
         } else {
             baseTopic = _mqttTopic;
         }
