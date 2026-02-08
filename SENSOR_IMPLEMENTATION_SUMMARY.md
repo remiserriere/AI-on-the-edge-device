@@ -32,8 +32,10 @@ Added comprehensive support for external temperature and humidity sensors to AI-
 ```ini
 # Step 1: Configure GPIO pins for sensors
 [GPIO]
-IO12 = i2c-sda          # I²C data line
-IO13 = i2c-scl          # I²C clock line
+IO3 = i2c-sda          # I²C data line *
+IO1 = i2c-scl          # I²C clock line *
+# NOTE: USB serial logging must be disabled when using GPIO1/GPIO3
+# CRITICAL: DO NOT use GPIO12 - it's a boot strapping pin that prevents boot!
 
 # Step 2: Configure SHT3x sensor
 [SHT3x]
@@ -165,8 +167,11 @@ SHT3x Sensor      ESP32-CAM
 ------------      ---------
 VDD       ------> 3.3V
 GND       ------> GND
-SDA       ------> GPIO12 (+ 4.7kΩ pull-up to 3.3V)
-SCL       ------> GPIO13 (+ 4.7kΩ pull-up to 3.3V)
+SDA       ------> GPIO3 (+ 4.7kΩ pull-up to 3.3V) *
+SCL       ------> GPIO1 (+ 4.7kΩ pull-up to 3.3V) *
+
+* Requires disabling USB serial logging
+⚠️ DO NOT use GPIO12 - boot strapping pin will prevent boot!
 ```
 
 ### DS18B20 (Single)
@@ -175,7 +180,10 @@ DS18B20 Sensor    ESP32-CAM
 --------------    ---------
 VDD       ------> 3.3V
 GND       ------> GND
-DATA      ------> GPIO12 (+ 4.7kΩ pull-up to 3.3V)
+DATA      ------> GPIO3 (+ 4.7kΩ pull-up to 3.3V) *
+
+* Requires disabling USB serial logging
+⚠️ DO NOT use GPIO12 - boot strapping pin will prevent boot!
 ```
 
 ### DS18B20 (Chained - 3 sensors)
@@ -185,7 +193,7 @@ DATA      ------> GPIO12 (+ 4.7kΩ pull-up to 3.3V)
             |       |
        1-Wire Bus   |
 ESP32 --|---+       |
-        |   |       |
+(GPIO3) |   |       |
    DS18B20_A (Inside)
         |   |       |
    DS18B20_B (Outside)
@@ -193,6 +201,8 @@ ESP32 --|---+       |
    DS18B20_C (Pipe)
         |           |
 GND  ---|-----------|
+
+⚠️ DO NOT use GPIO12 for 1-Wire - boot strapping pin will prevent boot!
 ```
 
 Each sensor identified by unique ROM ID in MQTT/InfluxDB.
@@ -299,7 +309,9 @@ Documentation:
    - Impact: Minimal on typical 5-10 minute flow cycles
    - Note: Each sensor with custom interval now runs in its own task (latest version)
 
-2. **GPIO Pins**: Limited to IO1, IO3, IO12, IO13
+2. **GPIO Pins**: Limited to IO1, IO3 (USB logging must be disabled)
+   - **GPIO12 MUST NOT be used** - Boot strapping pin causes boot failure with pull-ups
+   - **GPIO13** - Not recommended (SD card conflict)
    - Impact: Other GPIOs may conflict with camera/SD
    - Mitigation: Clear documentation of safe pins
 
@@ -307,6 +319,26 @@ Documentation:
    - Impact: Manual sensor configuration required
    - Workaround: Example YAML provided in docs
    - Future: Add MQTT discovery messages
+
+## ⚠️ CRITICAL: GPIO12 Boot Strapping Pin Issue
+
+**NEVER use GPIO12 for I²C or 1-Wire sensors!**
+
+GPIO12 is a strapping pin that determines flash voltage at boot:
+- GPIO12 LOW at boot = 3.3V flash voltage (standard)
+- GPIO12 HIGH at boot = 1.8V flash voltage (rare)
+
+When sensors with pull-up resistors (I²C, 1-Wire) are connected to GPIO12, the pull-up holds GPIO12 HIGH during boot, causing the ESP32 to enter 1.8V flash mode. On standard 3.3V flash modules, this results in **complete boot failure**.
+
+**Symptoms:**
+- Device does not boot when sensor is connected
+- Device boots fine when sensor is disconnected
+- Boot error logs show: `invalid header: 0xffffffff` or `ets_main.c`
+
+**Solution:**
+- Use GPIO1 or GPIO3 instead (requires disabling USB serial logging)
+- Never use GPIO12 for sensor interfaces requiring pull-up resistors
+- See updated documentation for safe GPIO pin selection
 
 ## Recent Improvements
 

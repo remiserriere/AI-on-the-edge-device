@@ -40,9 +40,13 @@ This is useful for:
 2. Scroll to the **GPIO** section
 3. Click **"Show Expert Options"** or **"Advanced Settings"** to reveal GPIO configuration
 4. Configure two pins:
-   - One pin set to **`i2c-sda`** (e.g., IO12)
-   - One pin set to **`i2c-scl`** (e.g., IO13)
+   - One pin set to **`i2c-sda`** (e.g., IO3) *
+   - One pin set to **`i2c-scl`** (e.g., IO1) *
 5. Save configuration and restart
+
+**CRITICAL**: Do NOT use GPIO12 for I²C! It's a boot strapping pin that will prevent the device from booting when sensors with pull-up resistors are connected.
+
+\* Requires disabling USB serial logging
 
 See detailed guides:
 - [GPIO I²C SDA Configuration](../GPIO/I2C-SDA.md)
@@ -54,16 +58,19 @@ See detailed guides:
 After GPIO configuration, wire the sensor:
 - VDD → 3.3V (**NOT 5V!**)
 - GND → GND
-- SDA → Configured SDA GPIO (e.g., IO12)
-- SCL → Configured SCL GPIO (e.g., IO13)
+- SDA → Configured SDA GPIO (e.g., IO3) *
+- SCL → Configured SCL GPIO (e.g., IO1) *
 - Add 4.7kΩ pull-up resistors on both SDA and SCL lines
+
+\* Requires disabling USB serial logging. **DO NOT use GPIO12** - it's a boot strapping pin that will prevent boot!
 
 ## Configuration Example
 
 ```ini
 [GPIO]
-IO12 = i2c-sda
-IO13 = i2c-scl
+IO3 = i2c-sda
+IO1 = i2c-scl
+# NOTE: USB serial logging must be disabled when using GPIO1/GPIO3
 
 [SHT3x]
 Enable = true
@@ -74,13 +81,19 @@ I2C_Frequency = 100000
 
 ## Troubleshooting
 
+**Device won't boot when sensor connected:**
+- **CAUSE**: GPIO12 strapping pin conflict with pull-up resistor
+- **SOLUTION**: Use GPIO1/GPIO3 instead of GPIO12
+- **Boot error logs**: May show `invalid header: 0xffffffff` or `ets_main.c` errors
+
 **Sensor not detected:**
 1. Verify GPIO pins are configured as `i2c-sda` and `i2c-scl`
 2. Check physical wiring (SDA, SCL, VDD, GND)
 3. Confirm pull-up resistors (4.7kΩ) are installed
-4. Try the alternative address (0x45 if using 0x44, or vice versa)
-5. Use an I²C scanner tool to verify the sensor is responding
-6. Check device logs for I²C initialization errors
+4. Confirm USB logging is disabled if using GPIO1/GPIO3
+5. Try the alternative address (0x45 if using 0x44, or vice versa)
+6. Use an I²C scanner tool to verify the sensor is responding
+7. Check device logs for I²C initialization errors
 
 **Wrong readings or erratic behavior:**
 - EMI interference: Add shorter wires, better shielding
