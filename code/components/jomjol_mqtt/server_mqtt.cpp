@@ -86,7 +86,7 @@ std::string getSensorBaseTopic(const std::string& customTopic, const std::string
 
 bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
     std::string name, std::string icon, std::string unit, std::string deviceClass, std::string stateClass, std::string entityCategory,
-    int qos, std::string discoveryBaseTopic = "") {
+    int qos, std::string discoveryBaseTopic = "", std::string sensorTypePrefix = "") {
     std::string version = std::string(libfive_git_version());
 
     if (version == "") {
@@ -106,12 +106,22 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
         // Replace "/" with "_" to create valid MQTT topic names
         std::string sanitized_group = group;
         std::replace(sanitized_group.begin(), sanitized_group.end(), '/', '_');
-        configTopic = sanitized_group + "_" + field;
+        
+        // For external sensors, prepend sensor type prefix to ensure uniqueness across sensor types
+        if (sensorTypePrefix != "") {
+            configTopic = sensorTypePrefix + "_" + sanitized_group + "_" + field;
+        } else {
+            configTopic = sanitized_group + "_" + field;
+        }
         
         // For multiple meters, also update the name
         if ((*NUMBERS).size() > 1) {
             name = group + " " + name;
         }
+    }
+    // For external sensors with empty group, add sensor type prefix to config topic for uniqueness
+    else if (sensorTypePrefix != "") {
+        configTopic = sensorTypePrefix + "_" + field;
     }
 
     if (field == "problem") { // Special case: Binary sensor which is based on error topic
@@ -129,9 +139,14 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
      *      <discovery_prefix>/<component>/[<node_id>/]<object_id>/config
      * if the main topic is embedded in a nested structure, we just use the last part as node_id 
      * This means a maintopic "home/test/watermeter" is transformed to the discovery topic "homeassistant/sensor/watermeter/..."
+     * 
+     * IMPORTANT: For external sensors with custom topics, we still use maintopic as node_id
+     * to keep all sensors grouped under the parent device in Home Assistant, but we use
+     * the custom topic (discoveryBaseTopic) for state_topic to match where data is actually published.
     */
     std::string baseTopic = discoveryBaseTopic.empty() ? maintopic : discoveryBaseTopic;
-    std::string node_id = createNodeId(baseTopic);
+    // Always use maintopic for node_id to keep sensors grouped under parent device
+    std::string node_id = createNodeId(maintopic);
     topicFull = "homeassistant/" + component + "/" + node_id + "/" + configTopic + "/config";
     
     /* See https://www.home-assistant.io/docs/mqtt/discovery/ */
@@ -280,13 +295,15 @@ bool MQTThomeassistantDiscovery(int qos) {
                 
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for SHT3x sensor with base topic: " + baseTopic);
                 
-                // SHT3x Temperature sensor
-                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "temperature", 
-                    "SHT3x Temperature", "thermometer", "°C", "temperature", "measurement", "", qos, baseTopic);
+                // SHT3x sensors: baseTopic already includes sensor type (either custom or maintopic/sht3x)
+                // Data is published to: baseTopic/temperature and baseTopic/humidity
+                // So state_topic should be: ~/temperature and ~/humidity (empty group)
+                // Pass sensorTypePrefix to create unique config topics (sht3x_temperature, sht3x_humidity)
+                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("", "temperature", 
+                    "SHT3x Temperature", "thermometer", "°C", "temperature", "measurement", "", qos, baseTopic, "sht3x");
                 
-                // SHT3x Humidity sensor
-                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "humidity", 
-                    "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos, baseTopic);
+                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("", "humidity", 
+                    "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos, baseTopic, "sht3x");
                 
                 sht3xPublished = true;
             }
@@ -306,10 +323,12 @@ bool MQTThomeassistantDiscovery(int qos) {
                     
                     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for DS18B20 " + romId + " with base topic: " + baseTopic);
                     
-                    // Create discovery topic for each DS18B20 sensor
-                    // Using "ds18b20/ROM_ID" as group to match the MQTT topic structure
-                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("ds18b20/" + romId, "temperature",
-                        "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos, baseTopic);
+                    // DS18B20 sensors: baseTopic already includes sensor type (either custom or maintopic/ds18b20)
+                    // Data is published to: baseTopic/ROM_ID/temperature
+                    // So state_topic should be: ~/ROM_ID/temperature (group = ROM_ID only)
+                    // Pass sensorTypePrefix to ensure unique config topics (ds18b20_ROM_ID_temperature)
+                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(romId, "temperature",
+                        "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos, baseTopic, "ds18b20");
                 }
                 
                 ds18b20Published = true;
