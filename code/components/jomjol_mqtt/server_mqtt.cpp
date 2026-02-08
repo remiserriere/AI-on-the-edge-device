@@ -196,8 +196,10 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
         payload += "\"entity_category\": \"" + entityCategory + "\",";
     } 
 
+    // Availability topic: Always use maintopic for LWT (Last Will and Testament)
+    // The actual connection status is published to maintopic/connection, not to custom sensor topics
     payload += 
-        "\"availability_topic\": \"~/" + std::string(LWT_TOPIC) + "\","  +
+        "\"availability_topic\": \"" + maintopic + "/" + std::string(LWT_TOPIC) + "\","  +
         "\"payload_available\": \"" + LWT_CONNECTED + "\","  +
         "\"payload_not_available\": \"" + LWT_DISCONNECTED + "\",";
 
