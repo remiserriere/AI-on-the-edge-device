@@ -86,6 +86,12 @@ public:
      * @return true if read is in progress
      */
     virtual bool isReadInProgress() const { return false; }
+    
+    /**
+     * @brief Get the MQTT topic for this sensor
+     * @return MQTT topic string (empty if using default)
+     */
+    std::string getMqttTopic() const { return _mqttTopic; }
 
 protected:
     std::string _mqttTopic;

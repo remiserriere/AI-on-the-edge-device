@@ -73,7 +73,7 @@ std::string createNodeId(std::string &topic) {
 
 bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
     std::string name, std::string icon, std::string unit, std::string deviceClass, std::string stateClass, std::string entityCategory,
-    int qos) {
+    int qos, std::string customBaseTopic = "") {
     std::string version = std::string(libfive_git_version());
 
     if (version == "") {
@@ -117,15 +117,16 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
      * if the main topic is embedded in a nested structure, we just use the last part as node_id 
      * This means a maintopic "home/test/watermeter" is transformed to the discovery topic "homeassistant/sensor/watermeter/..."
     */
-    std::string node_id = createNodeId(maintopic);
+    std::string baseTopic = customBaseTopic.empty() ? maintopic : customBaseTopic;
+    std::string node_id = createNodeId(baseTopic);
     topicFull = "homeassistant/" + component + "/" + node_id + "/" + configTopic + "/config";
     
     /* See https://www.home-assistant.io/docs/mqtt/discovery/ */
     payload = string("{")  +
-        "\"~\": \"" + maintopic + "\","  +
-        "\"unique_id\": \"" + maintopic + "-" + configTopic + "\","  +
-        "\"object_id\": \"" + maintopic + "_" + configTopic + "\","  + // Default entity ID; required for HA <= 2025.10
-        "\"default_entity_id\": \"" + component + "." + maintopic + "_" + configTopic + "\"," + // Default entity ID; required in HA >=2026.4
+        "\"~\": \"" + baseTopic + "\","  +
+        "\"unique_id\": \"" + baseTopic + "-" + configTopic + "\","  +
+        "\"object_id\": \"" + baseTopic + "_" + configTopic + "\","  + // Default entity ID; required for HA <= 2025.10
+        "\"default_entity_id\": \"" + component + "." + baseTopic + "_" + configTopic + "\"," + // Default entity ID; required in HA >=2026.4
         "\"name\": \"" + name + "\","  +
         "\"icon\": \"mdi:" + icon + "\",";        
 
@@ -173,8 +174,8 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
         "\"payload_not_available\": \"" + LWT_DISCONNECTED + "\",";
 
     payload += string("\"device\": {")  +
-        "\"identifiers\": [\"" + maintopic + "\"],"  +
-        "\"name\": \"" + maintopic + "\","  +
+        "\"identifiers\": [\"" + baseTopic + "\"],"  +
+        "\"name\": \"" + baseTopic + "\","  +
         "\"model\": \"Meter Digitizer\","  +
         "\"manufacturer\": \"AI on the Edge Device\","  +
       "\"sw_version\": \"" + version + "\","  +
@@ -261,15 +262,28 @@ bool MQTThomeassistantDiscovery(int qos) {
                 // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
                 auto* sht3x = static_cast<SensorSHT3x*>(sensor.get());
                 
-                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for SHT3x sensor");
+                // Get custom MQTT topic from sensor configuration
+                std::string sensorMqttTopic = sensor->getMqttTopic();
+                
+                // Determine base topic for HAD
+                std::string baseTopic;
+                if (sensorMqttTopic.empty()) {
+                    // Use main topic with "sht3x" subfolder as default
+                    baseTopic = maintopic + "/sht3x";
+                } else {
+                    // Use custom topic configured for this sensor
+                    baseTopic = sensorMqttTopic;
+                }
+                
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for SHT3x sensor with base topic: " + baseTopic);
                 
                 // SHT3x Temperature sensor
                 allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "temperature", 
-                    "SHT3x Temperature", "thermometer", "°C", "temperature", "measurement", "", qos);
+                    "SHT3x Temperature", "thermometer", "°C", "temperature", "measurement", "", qos, baseTopic);
                 
                 // SHT3x Humidity sensor
                 allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "humidity", 
-                    "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos);
+                    "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos, baseTopic);
                 
                 sht3xPublished = true;
             }
@@ -278,16 +292,31 @@ bool MQTThomeassistantDiscovery(int qos) {
                 // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
                 auto* ds18b20 = static_cast<SensorDS18B20*>(sensor.get());
                 
+                // Get custom MQTT topic from sensor configuration
+                std::string sensorMqttTopic = sensor->getMqttTopic();
+                
                 int count = ds18b20->getSensorCount();
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for " + std::to_string(count) + " DS18B20 sensor(s)");
                 
                 for (int i = 0; i < count; i++) {
                     std::string romId = ds18b20->getRomId(i);
                     
+                    // Determine base topic for HAD
+                    std::string baseTopic;
+                    if (sensorMqttTopic.empty()) {
+                        // Use main topic with "ds18b20" subfolder as default
+                        baseTopic = maintopic + "/ds18b20";
+                    } else {
+                        // Use custom topic configured for this sensor
+                        baseTopic = sensorMqttTopic;
+                    }
+                    
+                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for DS18B20 " + romId + " with base topic: " + baseTopic);
+                    
                     // Create discovery topic for each DS18B20 sensor
                     // Using "ds18b20/ROM_ID" as group to match the MQTT topic structure
                     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("ds18b20/" + romId, "temperature",
-                        "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos);
+                        "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos, baseTopic);
                 }
                 
                 ds18b20Published = true;
