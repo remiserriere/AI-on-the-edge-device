@@ -242,7 +242,7 @@ bool MQTThomeassistantDiscovery(int qos) {
         const auto& sensors = sensorManager->getSensors();
         for (const auto& sensor : sensors) {
             if (sensor->getName() == "SHT3x") {
-                auto* sht3x = static_cast<SensorSHT3x*>(sensor.get());
+                auto* sht3x = dynamic_cast<SensorSHT3x*>(sensor.get());
                 if (sht3x) {
                     // SHT3x Temperature sensor
                     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "temperature", 
@@ -254,7 +254,7 @@ bool MQTThomeassistantDiscovery(int qos) {
                 }
             }
             else if (sensor->getName() == "DS18B20") {
-                auto* ds18b20 = static_cast<SensorDS18B20*>(sensor.get());
+                auto* ds18b20 = dynamic_cast<SensorDS18B20*>(sensor.get());
                 if (ds18b20) {
                     int count = ds18b20->getSensorCount();
                     for (int i = 0; i < count; i++) {

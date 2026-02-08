@@ -685,6 +685,8 @@ void SensorDS18B20::publishMQTT()
     
     for (size_t i = 0; i < _temperatures.size(); i++) {
         // Determine base topic: use main topic if config topic is empty, otherwise use config topic
+        // Note: This creates a dependency on the MQTT server module, but follows the existing pattern
+        // used by other components (e.g., ClassFlowControll, server_GPIO) that call mqttServer_getMainTopic()
         std::string baseTopic;
         if (_mqttTopic.empty()) {
             baseTopic = mqttServer_getMainTopic();
