@@ -34,8 +34,9 @@ SensorDS18B20::SensorDS18B20(gpio_num_t gpio,
                              const std::string& influxMeasurement,
                              int interval,
                              bool mqttEnabled,
-                             bool influxEnabled)
-    : _gpio(gpio), _initialized(false), _readTaskHandle(nullptr), _readSuccess(false)
+                             bool influxEnabled,
+                             int expectedSensors)
+    : _gpio(gpio), _initialized(false), _readTaskHandle(nullptr), _readSuccess(false), _expectedSensors(expectedSensors)
 {
     _mqttTopic = mqttTopic;
     _influxMeasurement = influxMeasurement;
@@ -382,6 +383,11 @@ bool SensorDS18B20::init()
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initializing DS18B20 sensor on GPIO" + 
                         std::to_string(_gpio));
     
+    // Log expected sensor count if configured
+    if (_expectedSensors > 0) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Expected sensor count: " + std::to_string(_expectedSensors));
+    }
+    
     // Configure GPIO
     gpio_reset_pin(_gpio);
     gpio_set_pull_mode(_gpio, GPIO_PULLUP_ONLY);  // Enable pull-up
@@ -399,11 +405,68 @@ bool SensorDS18B20::init()
     // Perform ROM search to find all devices on the bus (ONE-TIME at startup)
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "=== DS18B20 ROM Search (startup only) ===");
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Scanning 1-Wire bus for DS18B20 devices...");
-    int deviceCount = performRomSearch(_romIds);
+    
+    // Retry ROM search with validation
+    const int MAX_ROM_SEARCH_RETRIES = 5;
+    int deviceCount = 0;
+    int bestDeviceCount = 0;
+    std::vector<std::array<uint8_t, 8>> bestRomIds;
+    
+    for (int retry = 0; retry < MAX_ROM_SEARCH_RETRIES; retry++) {
+        if (retry > 0) {
+            int delayMs = 100 + (retry * 50);  // 100ms, 150ms, 200ms, 250ms, 300ms
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "ROM search retry " + std::to_string(retry + 1) + 
+                                " after " + std::to_string(delayMs) + "ms");
+            vTaskDelay(pdMS_TO_TICKS(delayMs));
+        }
+        
+        deviceCount = performRomSearch(_romIds);
+        
+        // Keep track of best result
+        if (deviceCount > bestDeviceCount) {
+            bestDeviceCount = deviceCount;
+            bestRomIds = _romIds;
+        }
+        
+        // If expected sensor count is set, validate against it
+        if (_expectedSensors > 0) {
+            if (deviceCount == _expectedSensors) {
+                LogFile.WriteToFile(ESP_LOG_INFO, TAG, "ROM search found expected " + 
+                                    std::to_string(deviceCount) + " sensor(s) on retry " + std::to_string(retry + 1));
+                break;
+            } else if (deviceCount > 0) {
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "ROM search found " + std::to_string(deviceCount) + 
+                                    " sensor(s), expected " + std::to_string(_expectedSensors));
+            }
+        } else {
+            // Auto-detect mode: accept any positive result
+            if (deviceCount > 0) {
+                LogFile.WriteToFile(ESP_LOG_INFO, TAG, "ROM search found " + std::to_string(deviceCount) + 
+                                    " sensor(s) on retry " + std::to_string(retry + 1));
+                break;
+            }
+        }
+    }
+    
+    // Use best result if we didn't get the expected count (only when ExpectedSensors is configured)
+    if (_expectedSensors > 0 && deviceCount != _expectedSensors && bestDeviceCount > 0) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Using best ROM search result: " + 
+                            std::to_string(bestDeviceCount) + " sensor(s)");
+        _romIds = bestRomIds;
+        deviceCount = bestDeviceCount;
+    }
     
     if (deviceCount == 0) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ROM search found no DS18B20 devices");
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ROM search found no DS18B20 devices after " + 
+                            std::to_string(MAX_ROM_SEARCH_RETRIES) + " retries");
         return false;
+    }
+    
+    // Log warning if we found fewer sensors than expected
+    if (_expectedSensors > 0 && deviceCount < _expectedSensors) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Found " + std::to_string(deviceCount) + 
+                            " sensor(s) but expected " + std::to_string(_expectedSensors) + 
+                            " - continuing with detected sensors");
     }
     
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "ROM search complete: Found " + std::to_string(deviceCount) + " DS18B20 sensor(s)");

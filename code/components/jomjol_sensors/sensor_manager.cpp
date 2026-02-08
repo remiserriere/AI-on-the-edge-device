@@ -340,7 +340,8 @@ bool SensorManager::initFromConfig(const std::string& configFile, const std::map
                 config.influxMeasurement,
                 config.interval,
                 config.mqttEnable,
-                config.influxEnable
+                config.influxEnable,
+                config.expectedSensors
             );
             
             LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Created DS18B20 sensor (GPIO:" + std::to_string(onewirePin) + 
