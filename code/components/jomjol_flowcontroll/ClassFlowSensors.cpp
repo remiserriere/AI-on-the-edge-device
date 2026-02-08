@@ -186,6 +186,18 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
                     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "SHT3x: Invalid I2C frequency value: " + value);
                 }
             }
+        } else if (sensorType == "DS18B20") {
+            // DS18B20-specific parameters
+            if (param == "EXPECTEDSENSORS") {
+                if (safeParseInt(value, config.expectedSensors)) {
+                    if (config.expectedSensors < -1 || config.expectedSensors == 0) {
+                        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20: ExpectedSensors must be -1 (auto-detect) or positive, got: " + value);
+                        config.expectedSensors = -1;
+                    }
+                } else {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20: Invalid ExpectedSensors value: " + value);
+                }
+            }
         }
     }
     

@@ -26,13 +26,15 @@ public:
      * @param interval Read interval in seconds
      * @param mqttEnabled Enable MQTT publishing
      * @param influxEnabled Enable InfluxDB publishing
+     * @param expectedSensors Expected number of sensors (-1 = auto-detect, >0 = expected count for validation)
      */
     SensorDS18B20(gpio_num_t gpio,
                   const std::string& mqttTopic,
                   const std::string& influxMeasurement,
                   int interval,
                   bool mqttEnabled,
-                  bool influxEnabled);
+                  bool influxEnabled,
+                  int expectedSensors = -1);
     
     virtual ~SensorDS18B20();
     
@@ -74,6 +76,7 @@ private:
     bool _initialized;
     TaskHandle_t _readTaskHandle;  // Handle for background read task
     bool _readSuccess;  // Result of background read
+    int _expectedSensors;  // Expected number of sensors (-1 = auto-detect)
     
     /**
      * @brief Background task that polls sensors until conversion complete

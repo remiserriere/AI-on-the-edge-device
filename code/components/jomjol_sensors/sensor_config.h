@@ -20,4 +20,7 @@ struct SensorConfig {
     // SHT3x specific parameters
     uint8_t sht3xAddress = 0x44;  // Default I2C address
     uint32_t i2cFreq = 100000;    // Default 100kHz
+    
+    // DS18B20 specific parameters
+    int expectedSensors = -1;  // -1 = auto-detect (default), >0 = expected sensor count for retry validation
 };
