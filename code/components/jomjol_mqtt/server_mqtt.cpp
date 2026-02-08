@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iomanip>
 #include <vector>
+#include <algorithm>
 
 #include "esp_log.h"
 #include "ClassLogFile.h"
@@ -86,9 +87,18 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
 
     configTopic = field;
 
-    if (group != "" && (*NUMBERS).size() > 1) { // There is more than one meter, prepend the group so we can differentiate them
-        configTopic = group + "_" + field;
-        name = group + " " + name;
+    // Include group in configTopic if provided to ensure uniqueness for multiple sensors
+    // This is essential for external sensors like multiple DS18B20 where each needs a unique discovery topic
+    if (group != "") {
+        // Replace "/" with "_" to create valid MQTT topic names
+        std::string sanitized_group = group;
+        std::replace(sanitized_group.begin(), sanitized_group.end(), '/', '_');
+        configTopic = sanitized_group + "_" + field;
+        
+        // For multiple meters, also update the name
+        if ((*NUMBERS).size() > 1) {
+            name = group + " " + name;
+        }
     }
 
     if (field == "problem") { // Special case: Binary sensor which is based on error topic
