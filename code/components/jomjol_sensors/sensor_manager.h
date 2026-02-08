@@ -11,6 +11,7 @@
 #include <time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/timers.h"
 
 /**
  * @brief Base class for all sensors
@@ -96,12 +97,12 @@ protected:
     time_t _lastRead = 0;
     
 private:
-    TaskHandle_t _taskHandle = nullptr;
+    TimerHandle_t _timerHandle = nullptr;  // Timer for periodic reads (replaces persistent task)
     
     /**
-     * @brief Static task function wrapper for FreeRTOS
+     * @brief Static timer callback for FreeRTOS software timer
      */
-    static void sensorTaskWrapper(void* pvParameters);
+    static void timerCallback(TimerHandle_t xTimer);
     
     /**
      * @brief Periodic task function for reading sensor
