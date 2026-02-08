@@ -126,10 +126,8 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
     // Section found uncommented - enable the sensor (section comment/uncomment is the way to enable/disable)
     config.enable = true;
     
-    // Set default topics if not already set
-    if (config.mqttTopic.empty()) {
-        config.mqttTopic = (sensorType == "SHT3x") ? "sensors/sht3x" : "sensors/temperature";
-    }
+    // Set default InfluxDB measurement if not already set
+    // Note: mqttTopic is intentionally left empty so sensors use main MQTT topic by default
     if (config.influxMeasurement.empty()) {
         config.influxMeasurement = "environment";
     }

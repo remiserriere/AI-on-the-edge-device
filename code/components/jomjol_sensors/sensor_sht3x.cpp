@@ -3,6 +3,7 @@
 
 #ifdef ENABLE_MQTT
 #include "interface_mqtt.h"
+#include "server_mqtt.h"
 #endif
 
 #ifdef ENABLE_INFLUXDB
@@ -294,17 +295,27 @@ void SensorSHT3x::publishMQTT()
         return;
     }
     
+    // Determine base topic: use main topic if config topic is empty, otherwise use config topic
+    // Note: This creates a dependency on the MQTT server module, but follows the existing pattern
+    // used by other components (e.g., ClassFlowControll, server_GPIO) that call mqttServer_getMainTopic()
+    std::string baseTopic;
+    if (_mqttTopic.empty()) {
+        baseTopic = mqttServer_getMainTopic() + "/sht3x";
+    } else {
+        baseTopic = _mqttTopic;
+    }
+    
     // Publish temperature
-    std::string tempTopic = _mqttTopic + "/temperature";
+    std::string tempTopic = baseTopic + "/temperature";
     std::string tempValue = std::to_string(_temperature);
     MQTTPublish(tempTopic, tempValue, 1, true);
     
     // Publish humidity
-    std::string humTopic = _mqttTopic + "/humidity";
+    std::string humTopic = baseTopic + "/humidity";
     std::string humValue = std::to_string(_humidity);
     MQTTPublish(humTopic, humValue, 1, true);
     
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to MQTT");
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to MQTT: " + tempTopic + ", " + humTopic);
 #endif
 }
 

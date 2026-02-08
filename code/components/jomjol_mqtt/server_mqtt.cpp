@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iomanip>
 #include <vector>
+#include <algorithm>
 
 #include "esp_log.h"
 #include "ClassLogFile.h"
@@ -13,6 +14,11 @@
 #include "time_sntp.h"
 #include "../../include/defines.h"
 #include "basic_auth.h"
+
+// Include sensor manager for HomeAssistant Discovery
+#include "../jomjol_sensors/sensor_manager.h"
+#include "../jomjol_sensors/sensor_sht3x.h"
+#include "../jomjol_sensors/sensor_ds18b20.h"
 
 
 
@@ -25,6 +31,7 @@ extern const char* libfive_git_branch(void);
 extern std::string getFwVersion(void);
 
 std::vector<NumberPost*>* NUMBERS;
+SensorManager* sensorManager = nullptr;
 bool HomeassistantDiscovery = false;
 std::string meterType = "";
 std::string valueUnit = "";
@@ -42,6 +49,10 @@ void mqttServer_setParameter(std::vector<NumberPost*>* _NUMBERS, int _keepAlive,
     NUMBERS = _NUMBERS;
     keepAlive = _keepAlive;
     roundInterval = _roundInterval; 
+}
+
+void mqttServer_setSensorManager(SensorManager* _sensorManager) {
+    sensorManager = _sensorManager;
 }
 
 void mqttServer_setMeterType(std::string _meterType, std::string _valueUnit, std::string _timeUnit,std::string _rateUnit) {
@@ -76,9 +87,18 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
 
     configTopic = field;
 
-    if (group != "" && (*NUMBERS).size() > 1) { // There is more than one meter, prepend the group so we can differentiate them
-        configTopic = group + "_" + field;
-        name = group + " " + name;
+    // Include group in configTopic if provided to ensure uniqueness for multiple sensors
+    // This is essential for external sensors like multiple DS18B20 where each needs a unique discovery topic
+    if (group != "") {
+        // Replace "/" with "_" to create valid MQTT topic names
+        std::string sanitized_group = group;
+        std::replace(sanitized_group.begin(), sanitized_group.end(), '/', '_');
+        configTopic = sanitized_group + "_" + field;
+        
+        // For multiple meters, also update the name
+        if ((*NUMBERS).size() > 1) {
+            name = group + " " + name;
+        }
     }
 
     if (field == "problem") { // Special case: Binary sensor which is based on error topic
@@ -223,6 +243,56 @@ bool MQTThomeassistantDiscovery(int qos) {
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "timestamp",                  "Timestamp",                            "clock-time-eight-outline",  "",                    "timestamp",       "",                 "diagnostic",     qos);
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "json",                       "JSON",                                 "code-json",                 "",                    "",                "",                 "diagnostic",     qos);
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "problem",                    "Problem",                              "alert-outline",             "",                    "problem",         "",                 "",               qos); // Special binary sensor which is based on error topic
+    }
+
+    // Publish HomeAssistant Discovery for external sensors (SHT3x, DS18B20)
+    if (sensorManager && sensorManager->isEnabled()) {
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HomeAssistant Discovery topics for external sensors...");
+        
+        const auto& sensors = sensorManager->getSensors();
+        
+        // Track which sensor types we've already published to avoid duplicates
+        bool sht3xPublished = false;
+        bool ds18b20Published = false;
+        
+        for (const auto& sensor : sensors) {
+            if (sensor->getName() == "SHT3x" && !sht3xPublished) {
+                // Safe to use static_cast here because getName() guarantees the type
+                // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
+                auto* sht3x = static_cast<SensorSHT3x*>(sensor.get());
+                
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for SHT3x sensor");
+                
+                // SHT3x Temperature sensor
+                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "temperature", 
+                    "SHT3x Temperature", "thermometer", "°C", "temperature", "measurement", "", qos);
+                
+                // SHT3x Humidity sensor
+                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "humidity", 
+                    "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos);
+                
+                sht3xPublished = true;
+            }
+            else if (sensor->getName() == "DS18B20" && !ds18b20Published) {
+                // Safe to use static_cast here because getName() guarantees the type
+                // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
+                auto* ds18b20 = static_cast<SensorDS18B20*>(sensor.get());
+                
+                int count = ds18b20->getSensorCount();
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for " + std::to_string(count) + " DS18B20 sensor(s)");
+                
+                for (int i = 0; i < count; i++) {
+                    std::string romId = ds18b20->getRomId(i);
+                    
+                    // Create discovery topic for each DS18B20 sensor
+                    // Using "ds18b20/ROM_ID" as group to match the MQTT topic structure
+                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("ds18b20/" + romId, "temperature",
+                        "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos);
+                }
+                
+                ds18b20Published = true;
+            }
+        }
     }
 
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Successfully published all Homeassistant Discovery MQTT topics");
