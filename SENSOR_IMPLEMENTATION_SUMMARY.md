@@ -170,7 +170,7 @@ GND       ------> GND
 SDA       ------> GPIO3 (+ 4.7kΩ pull-up to 3.3V) *
 SCL       ------> GPIO1 (+ 4.7kΩ pull-up to 3.3V) *
 
-* Requires disabling USB serial logging
+* Using GPIO1/GPIO3 will disable USB serial logging
 ⚠️ DO NOT use GPIO12 - boot strapping pin will prevent boot!
 ```
 
@@ -182,7 +182,7 @@ VDD       ------> 3.3V
 GND       ------> GND
 DATA      ------> GPIO3 (+ 4.7kΩ pull-up to 3.3V) *
 
-* Requires disabling USB serial logging
+* Using GPIO1/GPIO3 will disable USB serial logging
 ⚠️ DO NOT use GPIO12 - boot strapping pin will prevent boot!
 ```
 
@@ -336,7 +336,7 @@ When sensors with pull-up resistors (I²C, 1-Wire) are connected to GPIO12, the 
 - Boot error logs show: `invalid header: 0xffffffff` or `ets_main.c`
 
 **Solution:**
-- Use GPIO1 or GPIO3 instead (requires disabling USB serial logging)
+- Use GPIO1 or GPIO3 instead (disables USB serial logging)
 - Never use GPIO12 for sensor interfaces requiring pull-up resistors
 - See updated documentation for safe GPIO pin selection
 

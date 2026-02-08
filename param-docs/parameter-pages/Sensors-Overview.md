@@ -82,7 +82,7 @@ Sensors are configured in **three parts** (in this order):
 
 **CRITICAL**: Do NOT use GPIO12 for sensors! It's a boot strapping pin that will prevent boot when pull-up resistors are connected.
 
-\* Requires disabling USB serial logging
+\* Using GPIO1/GPIO3 will disable USB serial logging
 
 **Detailed GPIO Configuration Guides:**
 - [GPIO 1-Wire Configuration](GPIO/OneWire.md) - For DS18B20 sensors

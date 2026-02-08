@@ -8,7 +8,7 @@ Configure a GPIO pin for 1-Wire protocol used by DS18B20 temperature sensors.
 
 **Note:** GPIO12 is not available for 1-Wire in the configuration UI. This is a boot strapping pin that requires GPIO12 to be LOW at boot for standard 3.3V flash. 1-Wire sensors need a hardware pull-up resistor that holds GPIO12 HIGH during boot, causing boot failure.
 
-**Use GPIO3 or GPIO1 instead** (requires disabling USB logging). See [IO12 documentation](IO12.md) for technical details on why WS2812 LEDs work but 1-Wire sensors don't.
+**Use GPIO3 or GPIO1 instead** (disables USB serial logging). See [IO12 documentation](IO12.md) for technical details on why WS2812 LEDs work but 1-Wire sensors don't.
 
 ## Value
 Select `onewire` from the GPIO mode dropdown.
@@ -26,13 +26,13 @@ Configure a GPIO pin as `onewire` when you want to:
 
 | GPIO | Recommended | Notes |
 |------|-------------|-------|
-| **IO3** | ✅ **YES** | UART RX - requires disabling USB logging |
-| **IO1** | ✅ **YES** | UART TX - requires disabling USB logging |
+| **IO3** | ✅ **YES** | UART RX - disables USB serial logging |
+| **IO1** | ✅ **YES** | UART TX - disables USB serial logging |
 | **IO13** | ⚠️ USE WITH CAUTION | May conflict with SD card operations - not recommended |
 | **IO12** | ❌ **NEVER USE** | **STRAPPING PIN** - pull-up will prevent boot! |
 | **IO0** | ❌ **NEVER USE** | Boot mode selection strapping pin |
 
-**Recommended**: GPIO3 or GPIO1 (requires disabling USB serial logging)
+**Recommended**: GPIO3 or GPIO1 (disables USB serial logging)
 
 ## Wiring
 
@@ -44,7 +44,7 @@ VDD       -----> 3.3V
 GND       -----> GND
 DATA      -----> GPIO3 (with 4.7kΩ pull-up to 3.3V) *
 
-* Requires disabling USB serial logging in configuration
+* Using GPIO3/GPIO1 will disable USB serial logging in configuration
 ```
 
 ### Chained DS18B20 (Multiple Sensors)

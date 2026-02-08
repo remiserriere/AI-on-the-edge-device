@@ -22,21 +22,21 @@ Configure a GPIO pin as `i2c-sda` when you want to:
 
 **Note:** GPIO12 is not available for I²C SDA in the configuration UI. This is a boot strapping pin that requires GPIO12 to be LOW at boot for standard 3.3V flash. I²C sensors need hardware pull-up resistors that hold GPIO12 HIGH during boot, causing boot failure.
 
-**Use GPIO1 or GPIO3 instead** (requires disabling USB logging). See [IO12 documentation](IO12.md) for technical details on why WS2812 LEDs work but I²C sensors don't.
+**Use GPIO1 or GPIO3 instead** (disables USB serial logging). See [IO12 documentation](IO12.md) for technical details on why WS2812 LEDs work but I²C sensors don't.
 
 ## Compatible GPIO Pins
 
 | GPIO | Recommended | Notes |
 |------|-------------|-------|
-| **IO1** | ✅ **YES** | UART TX - requires disabling USB logging |
-| **IO3** | ✅ **YES** | UART RX - requires disabling USB logging |
+| **IO1** | ✅ **YES** | UART TX - disables USB serial logging |
+| **IO3** | ✅ **YES** | UART RX - disables USB serial logging |
 | **IO13** | ⚠️ CONDITIONAL | Only safe if 1-line SD card mode enabled (`__SD_USE_ONE_LINE_MODE__`) |
 | **IO12** | ❌ **NEVER USE** | **STRAPPING PIN** - pull-up will prevent boot! |
 | **IO0** | ❌ **NEVER USE** | Boot mode selection strapping pin |
 
 **Recommended Configuration:**
-- SDA: IO3 (with 4.7kΩ pull-up to 3.3V) *requires disabling USB logging*
-- SCL: IO1 (with 4.7kΩ pull-up to 3.3V) *requires disabling USB logging*
+- SDA: IO3 (with 4.7kΩ pull-up to 3.3V) *disables USB serial logging*
+- SCL: IO1 (with 4.7kΩ pull-up to 3.3V) *disables USB serial logging*
 
 Alternative if 1-line SD mode enabled:
 - SDA: IO13
@@ -52,7 +52,7 @@ GND       -----> GND
 SDA       -----> GPIO3 (with 4.7kΩ pull-up to 3.3V) *
 SCL       -----> GPIO1 (with 4.7kΩ pull-up to 3.3V) *
 
-* Requires disabling USB serial logging in configuration
+* Using GPIO1/GPIO3 will disable USB serial logging in configuration
 ```
 
 **Important**: External 4.7kΩ pull-up resistors are required for both SDA and SCL lines.

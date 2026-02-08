@@ -44,7 +44,7 @@ This is useful for:
    - One pin set to **`i2c-scl`** (e.g., IO1) *
 5. Save configuration and restart
 
-\* Requires disabling USB serial logging
+\* Using GPIO1/GPIO3 will disable USB serial logging
 
 **Note:** GPIO12 is not available for I²C in the configuration UI (boot strapping pin).
 
@@ -62,7 +62,7 @@ After GPIO configuration, wire the sensor:
 - SCL → Configured SCL GPIO (e.g., IO1) *
 - Add 4.7kΩ pull-up resistors on both SDA and SCL lines
 
-\* Requires disabling USB serial logging
+\* Using GPIO1/GPIO3 will disable USB serial logging
 
 ## Configuration Example
 
