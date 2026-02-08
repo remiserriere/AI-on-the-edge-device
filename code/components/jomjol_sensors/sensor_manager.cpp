@@ -118,28 +118,44 @@ void SensorBase::sensorTask()
     // Power-efficient sleep - completely yields CPU
     vTaskDelay(initialDelay);
     
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Starting main loop (reads every " + 
-                        std::to_string(_readInterval) + "s)");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Starting main loop (interval: " + 
+                        std::to_string(_readInterval) + "s between reads)");
     
     int iteration = 0;
     while (true) {
         iteration++;
         
-        // Minimal logging to conserve resources
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Iteration " + std::to_string(iteration));
         
         // Trigger async read (spawns separate task, returns immediately)
-        // Failproof: If read fails (returns false), we just skip and retry next iteration
-        // The delay always executes below, ensuring next read is always scheduled
         bool readStarted = readData();
         if (!readStarted) {
-            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read busy or failed, will retry next iteration");
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read busy or failed, will retry after interval");
+            // Even if read failed to start, still wait the interval before retrying
+            vTaskDelay(xDelay);
+            continue;
         }
         
-        // Power-efficient sleep - task yields CPU completely
-        // Zero CPU usage while sleeping, very power efficient
-        // CRITICAL: This ALWAYS executes, ensuring next iteration is scheduled
-        // even if readData() failed above
+        // Wait for async read task to complete before scheduling next iteration
+        // This ensures interval is BETWEEN reads, not overlapping reads
+        // Use polling with delays (power efficient - yields CPU between checks)
+        bool wasWaiting = false;
+        while (isReadInProgress()) {
+            if (!wasWaiting) {
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Waiting for async read to complete");
+                wasWaiting = true;
+            }
+            // Power-efficient: yield CPU while waiting
+            // Check every 100ms to be responsive but not wasteful
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        
+        if (wasWaiting) {
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Async read completed, starting interval delay");
+        }
+        
+        // Now that previous read is complete, wait for the configured interval
+        // This ensures reads happen at interval AFTER completion, not overlapping
         vTaskDelay(xDelay);
     }
 }
