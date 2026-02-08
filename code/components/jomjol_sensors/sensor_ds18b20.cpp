@@ -600,6 +600,7 @@ void SensorDS18B20::readTask()
 bool SensorDS18B20::readData()
 {
     if (!_initialized) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Cannot read DS18B20: sensor not initialized");
         return false;
     }
     
@@ -610,6 +611,7 @@ bool SensorDS18B20::readData()
     // 3. No window where task is active but handle is nullptr
     if (_readTaskHandle != nullptr) {
         // Read still in progress, return false (not complete yet)
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "DS18B20 read skipped: previous read task still in progress");
         return false;
     }
     

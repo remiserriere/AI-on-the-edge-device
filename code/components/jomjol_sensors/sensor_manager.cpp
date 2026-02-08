@@ -95,13 +95,27 @@ void SensorBase::sensorTask()
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task started for sensor: " + getName() + 
                         " (interval: " + std::to_string(_readInterval) + "s)");
     
-    const TickType_t xDelay = pdMS_TO_TICKS(_readInterval * 1000);
+    // Prevent integer overflow: _readInterval (seconds) * 1000 can overflow for large intervals
+    // Cast to uint64_t first, then convert to ticks
+    const TickType_t xDelay = pdMS_TO_TICKS((uint64_t)_readInterval * 1000ULL);
+    
+    // Add initial delay before first read to:
+    // 1. Allow system to fully stabilize after initialization
+    // 2. Stagger sensor reads across different intervals
+    // 3. Avoid immediate collision with async init tasks
+    vTaskDelay(xDelay);
     
     while (true) {
         // Read sensor data
         // Note: readData() spawns an async task that handles publishing
         // Don't publish here to avoid double-publishing
-        readData();
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Periodic task iteration for sensor: " + getName());
+        
+        bool readStarted = readData();
+        if (!readStarted) {
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to start read for sensor: " + getName() + 
+                                " (previous read still in progress or sensor not initialized)");
+        }
         
         vTaskDelay(xDelay);
     }
