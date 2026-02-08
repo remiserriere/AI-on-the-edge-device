@@ -35,6 +35,13 @@ public:
      */
     void setFlowControll(ClassFlowControll* controller) { _flowController = controller; }
     
+    /**
+     * @brief Initialize sensors early (before first flow run)
+     * Called after config loaded, GPIO initialized, and MQTT/InfluxDB ready
+     * Performs sensor initialization and first reading
+     */
+    void initializeEarly();
+    
 protected:
     void SetInitialParameter(void) override;
     

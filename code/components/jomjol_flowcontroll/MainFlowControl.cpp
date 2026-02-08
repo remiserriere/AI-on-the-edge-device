@@ -129,6 +129,21 @@ void doInit(void)
 #ifdef ENABLE_MQTT
     flowctrl.StartMQTTService();
 #endif // ENABLE_MQTT
+
+    /* Initialize sensors early - after GPIO, MQTT, InfluxDB are ready but before first flow run */
+    // Find the ClassFlowSensors instance and initialize it early
+    std::vector<ClassFlow*>* flows = flowctrl.GetFlowControll();
+    if (flows) {
+        for (auto* flow : *flows) {
+            if (flow && flow->name() == "ClassFlowSensors") {
+                ClassFlowSensors* sensorFlow = static_cast<ClassFlowSensors*>(flow);
+                sensorFlow->initializeEarly();
+                break;
+            }
+        }
+    }
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initialization complete - ready for flow runs");
 }
 
 bool doflow(void)
