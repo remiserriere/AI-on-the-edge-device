@@ -17,7 +17,12 @@
  */
 class SensorBase {
 public:
-    virtual ~SensorBase() = default;
+    virtual ~SensorBase() {
+        // CRITICAL: Stop periodic task before object is destroyed to prevent race condition
+        // The task runs in a separate thread and accesses member variables
+        // If we don't stop it, it will crash when trying to access freed memory
+        stopPeriodicTask();
+    }
     
     /**
      * @brief Initialize the sensor hardware

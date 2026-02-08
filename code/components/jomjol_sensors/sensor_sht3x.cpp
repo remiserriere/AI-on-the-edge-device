@@ -213,6 +213,7 @@ void SensorSHT3x::readTask()
 bool SensorSHT3x::readData()
 {
     if (!_initialized) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Cannot read SHT3x: sensor not initialized");
         return false;
     }
     
@@ -223,6 +224,7 @@ bool SensorSHT3x::readData()
     // 3. No window where task is active but handle is nullptr
     if (_readTaskHandle != nullptr) {
         // Read still in progress, return false (not complete yet)
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "SHT3x read skipped: previous read task still in progress");
         return false;
     }
     

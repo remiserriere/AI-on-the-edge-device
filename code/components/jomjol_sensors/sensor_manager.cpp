@@ -92,66 +92,170 @@ void SensorBase::sensorTaskWrapper(void* pvParameters)
 
 void SensorBase::sensorTask()
 {
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task started for sensor: " + getName() + 
-                        " (interval: " + std::to_string(_readInterval) + "s)");
+    // ============================================================================
+    // PERIODIC TASK FOR SENSOR READING (DS18B20, SHT3x, etc.)
+    // ============================================================================
+    // 
+    // This task runs for sensors with custom intervals (not "follow flow" mode).
+    // 
+    // SCHEDULING LOGIC:
+    //   1. Spawn async read task (returns immediately)
+    //   2. Wait for async task to complete (polls isReadInProgress())
+    //   3. Wait configured interval
+    //   4. Repeat
+    // 
+    // This ensures interval is time BETWEEN reads, not overlapping reads.
+    // Works correctly even if read takes longer than interval.
+    // 
+    // FAILPROOF FEATURES:
+    //   - If readData() fails: skips and retries after interval
+    //   - If async task hangs: timeout after 5 minutes, continue anyway
+    //   - vTaskDelay() always executes: next iteration always scheduled
+    //   - No try-catch: uses return values and timeouts
+    // 
+    // POWER EFFICIENCY:
+    //   - Task at tskIDLE_PRIORITY (lowest)
+    //   - vTaskDelay() yields CPU completely
+    //   - Polling uses 100ms delays (not busy wait)
+    // 
+    // USED BY: DS18B20, SHT3x (both inherit from SensorBase)
+    // ============================================================================
     
-    const TickType_t xDelay = (_readInterval * 1000) / portTICK_PERIOD_MS;
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task started (interval: " + 
+                        std::to_string(_readInterval) + "s)");
     
+    // Prevent integer overflow: _readInterval (seconds) * 1000 can overflow for large intervals
+    uint64_t intervalMs = (uint64_t)_readInterval * 1000ULL;
+    const uint64_t maxSafeMs = (uint64_t)UINT32_MAX * 1000ULL / configTICK_RATE_HZ;
+    if (intervalMs > maxSafeMs) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Interval exceeds maximum, capping to " + 
+                            std::to_string(maxSafeMs / 1000) + "s");
+        intervalMs = maxSafeMs;
+    }
+    const TickType_t xDelay = pdMS_TO_TICKS(intervalMs);
+    
+    // Initial delay before first read
+    TickType_t initialDelay = xDelay;
+    if (_readInterval > 300) {  // If interval > 5 minutes, use shorter initial delay
+        initialDelay = pdMS_TO_TICKS(30000);
+    }
+    
+    float delaySeconds = (float)initialDelay / (float)configTICK_RATE_HZ;
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Waiting " + std::to_string((int)delaySeconds) + 
+                        "s before first read");
+    
+    // Power-efficient sleep - completely yields CPU
+    vTaskDelay(initialDelay);
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Starting main loop (interval: " + 
+                        std::to_string(_readInterval) + "s between reads)");
+    
+    int iteration = 0;
     while (true) {
-        // Read sensor data
-        // Note: readData() spawns an async task that handles publishing
-        // Don't publish here to avoid double-publishing
-        readData();
+        iteration++;
         
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Iteration " + std::to_string(iteration));
+        
+        // Trigger async read (spawns separate task, returns immediately)
+        bool readStarted = readData();
+        if (!readStarted) {
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read busy or failed, will retry after interval");
+            // Even if read failed to start, still wait the interval before retrying
+            vTaskDelay(xDelay);
+            continue;
+        }
+        
+        // Wait for async read task to complete before scheduling next iteration
+        // This ensures interval is BETWEEN reads, not overlapping reads
+        // Use polling with delays (power efficient - yields CPU between checks)
+        // Add timeout to prevent infinite wait if async task crashes
+        bool wasWaiting = false;
+        int waitIterations = 0;
+        const int maxWaitIterations = 3000;  // 3000 * 100ms = 5 minutes max wait
+        
+        while (isReadInProgress()) {
+            if (!wasWaiting) {
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Waiting for async read to complete");
+                wasWaiting = true;
+            }
+            
+            // Power-efficient: yield CPU while waiting
+            // Check every 100ms to be responsive but not wasteful
+            vTaskDelay(pdMS_TO_TICKS(100));
+            
+            waitIterations++;
+            if (waitIterations >= maxWaitIterations) {
+                // Timeout: async task took too long or crashed
+                // Log error and continue to next iteration to prevent permanent hang
+                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, 
+                    "Timeout waiting for async read (waited " + 
+                    std::to_string(waitIterations / 10) + "s), continuing anyway");
+                break;  // Exit wait loop, proceed to interval delay
+            }
+        }
+        
+        if (wasWaiting) {
+            if (waitIterations < maxWaitIterations) {
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, 
+                    "Async read completed after " + std::to_string(waitIterations / 10) + "s");
+            }
+        }
+        
+        // Now that previous read is complete, wait for the configured interval
+        // This ensures reads happen at interval AFTER completion, not overlapping
         vTaskDelay(xDelay);
     }
 }
 
 bool SensorBase::startPeriodicTask()
 {
-    // Only create task if we have a custom interval (not follow flow mode)
+    // Only create task for custom intervals
+    // _readInterval = -1 means "follow flow" mode - handled by SensorManager::update()
+    // _readInterval > 0 means custom interval - needs dedicated task
     if (_readInterval <= 0) {
-        return true;  // Not an error, just not applicable
-    }
-    
-    if (_taskHandle != nullptr) {
-        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Task already running for sensor: " + getName());
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Using follow-flow mode, no periodic task");
         return true;
     }
     
-    std::string taskName = "sensor_" + getName();
-    // Truncate task name if too long (FreeRTOS limit is 16 chars)
-    if (taskName.length() > 15) {
-        taskName = taskName.substr(0, 15);
+    if (_taskHandle != nullptr) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Task already running");
+        return true;
     }
     
+    // Create task at IDLE priority to ensure it never blocks main digitalization flow
+    // This is critical for power and CPU efficiency
     BaseType_t xReturned = xTaskCreatePinnedToCore(
         &SensorBase::sensorTaskWrapper,
-        taskName.c_str(),
-        4096,  // Stack size
-        this,  // Parameter passed to task
-        tskIDLE_PRIORITY,  // Priority - low for periodic reading (not critical)
+        "sensor",              // Short name to save memory
+        4096,                  // Stack size
+        this,                  // Pass sensor object
+        tskIDLE_PRIORITY,      // LOWEST priority - never blocks main flow
         &_taskHandle,
-        0  // Core 0
+        0                      // Core 0
     );
     
     if (xReturned != pdPASS) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to create periodic task for sensor: " + getName());
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to create periodic task");
         _taskHandle = nullptr;
         return false;
     }
     
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Created periodic task for sensor: " + getName() + 
-                        " (interval: " + std::to_string(_readInterval) + "s)");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Created periodic task (interval: " + 
+                        std::to_string(_readInterval) + "s, priority: IDLE)");
     return true;
 }
 
 void SensorBase::stopPeriodicTask()
 {
     if (_taskHandle != nullptr) {
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Stopping periodic task for sensor: " + getName());
-        vTaskDelete(_taskHandle);
-        _taskHandle = nullptr;
+        TaskHandle_t taskToDelete = _taskHandle;
+        _taskHandle = nullptr;  // Clear atomically to prevent double-delete
+        
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Stopping periodic task");
+        vTaskDelete(taskToDelete);
+        
+        // Small delay to let scheduler cleanup
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
