@@ -18,18 +18,31 @@ Configure a GPIO pin as `i2c-scl` when you want to:
 
 **Next Step**: After configuring both SDA and SCL GPIO pins, go to the [SHT3x] configuration section and set `Enable = true`.
 
+## ⚠️ CRITICAL: GPIO12 Boot Strapping Pin Conflict
+
+**DO NOT use GPIO12 for I²C SCL!** GPIO12 is a critical strapping pin that determines flash voltage at boot. When using GPIO12 with I²C sensors requiring pull-up resistors, the pull-up holds GPIO12 HIGH during boot, causing the ESP32 to switch to 1.8V flash mode and **preventing the device from booting completely**.
+
+**Symptom:** ESP32 does not boot when sensor is connected, boots fine when disconnected.
+
+See [GPIO12 Strapping Pin Issue](I2C-SDA.md#critical-gpio12-boot-strapping-pin-conflict) for full details.
+
 ## Compatible GPIO Pins
 
 | GPIO | Recommended | Notes |
 |------|-------------|-------|
-| **IO13** | ✅ **Yes** | Best choice - has built-in pull-up resistor |
-| **IO12** | ⚠️ Possible | Better used for SDA |
-| **IO3** | ⚠️ Caution | Requires disabling USB logging |
-| **IO1** | ⚠️ Caution | UART TX - requires disabling USB logging |
+| **IO1** | ✅ **YES** | UART TX - requires disabling USB logging |
+| **IO3** | ✅ **YES** | UART RX - requires disabling USB logging |
+| **IO13** | ⚠️ CONDITIONAL | Only safe if 1-line SD card mode enabled (`__SD_USE_ONE_LINE_MODE__`) |
+| **IO12** | ❌ **NEVER USE** | **STRAPPING PIN** - pull-up will prevent boot! |
+| **IO0** | ❌ **NEVER USE** | Boot mode selection strapping pin |
 
 **Recommended Configuration:**
-- SCL: IO13 (built-in pull-up makes it ideal for clock)
-- SDA: IO12 (use for data line)
+- SCL: IO1 (with 4.7kΩ pull-up to 3.3V) *requires disabling USB logging*
+- SDA: IO3 (with 4.7kΩ pull-up to 3.3V) *requires disabling USB logging*
+
+Alternative if 1-line SD mode enabled:
+- SCL: IO13 (has built-in pull-up)
+- SDA: IO1 or IO3
 
 ## Wiring
 
@@ -38,18 +51,22 @@ SHT3x Sensor      ESP32-CAM
 ------------      ---------
 VDD       -----> 3.3V (NOT 5V!)
 GND       -----> GND
-SDA       -----> GPIO12 (with 4.7kΩ pull-up to 3.3V)
-SCL       -----> GPIO13 (with 4.7kΩ pull-up to 3.3V)
+SDA       -----> GPIO3 (with 4.7kΩ pull-up to 3.3V) *
+SCL       -----> GPIO1 (with 4.7kΩ pull-up to 3.3V) *
+
+* Requires disabling USB serial logging in configuration
 ```
 
-**Critical**: Always add external 4.7kΩ pull-up resistors on both SDA and SCL lines, even though IO13 has an internal pull-up.
+**Critical**: Always add external 4.7kΩ pull-up resistors on both SDA and SCL lines.
 
 ## Safety Considerations
 
 ⚠️ **Do NOT use these pins**:
-- IO0 (boot mode selection - device won't boot)
-- IO4 (used for SD card or flash LED)
-- IO14, IO15 (SD card - will corrupt data)
+- **IO12** - **CRITICAL: Strapping pin!** Pull-up resistor will prevent boot entirely
+- **IO0** - Boot mode selection strapping pin (device won't boot)
+- **IO2** - SD card D0
+- **IO4** - SD card D1 / Flash LED
+- **IO14, IO15** - SD card CLK/CMD (will corrupt data)
 
 Using these restricted pins can prevent the device from booting or cause SD card corruption.
 
@@ -81,8 +98,9 @@ I²C supports multiple sensors on the same bus (each with unique address):
 
 ```ini
 [GPIO]
-IO12 = i2c-sda    # Data line
-IO13 = i2c-scl    # Clock line (this setting)
+IO3 = i2c-sda    # Data line
+IO1 = i2c-scl    # Clock line (this setting)
+# NOTE: USB serial logging must be disabled when using GPIO1/GPIO3
 
 [SHT3x]
 Enable = true
@@ -97,13 +115,19 @@ InfluxDB_Measurement = environment
 
 ## Troubleshooting
 
+**Device won't boot when sensor connected:**
+- **CAUSE**: GPIO12 strapping pin conflict with pull-up resistor
+- **SOLUTION**: Use GPIO1/GPIO3 instead of GPIO12
+- **Boot error logs**: May show `invalid header: 0xffffffff` or `ets_main.c` errors
+
 **Sensor not detected:**
 1. ✅ Verify both `i2c-sda` AND `i2c-scl` are configured
 2. ✅ Check wiring connections (swap SDA/SCL if unsure)
 3. ✅ Confirm pull-up resistors (4.7kΩ) are installed on both lines
 4. ✅ Check power (3.3V, not 5V!)
-5. ✅ Try scanning for I²C address in device logs
-6. ✅ Lower I²C frequency to 100kHz in SHT3x settings
+5. ✅ Confirm USB logging is disabled if using GPIO1/GPIO3
+6. ✅ Try scanning for I²C address in device logs
+7. ✅ Lower I²C frequency to 100kHz in SHT3x settings
 
 **Communication errors:**
 - Swap SDA and SCL wires (easy to reverse them)

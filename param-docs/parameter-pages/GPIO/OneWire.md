@@ -4,6 +4,24 @@ Configure a GPIO pin for 1-Wire protocol used by DS18B20 temperature sensors.
 
 > **📍 Configuration Context**: This GPIO setting is part of the **advanced/expert settings** in the web UI. You need to configure this **before** enabling DS18B20 sensors. See [DS18B20 Enable](../DS18B20/Enable.md) for complete setup instructions.
 
+## ⚠️ CRITICAL: GPIO12 Boot Strapping Pin Conflict
+
+**DO NOT use GPIO12 for 1-Wire (OneWire)!** GPIO12 is a critical strapping pin that determines flash voltage at boot:
+- GPIO12 LOW at boot = 3.3V flash voltage (standard)
+- GPIO12 HIGH at boot = 1.8V flash voltage (rare)
+
+When using GPIO12 with DS18B20 sensors requiring a 4.7kΩ pull-up resistor, the pull-up holds GPIO12 HIGH during boot, causing the ESP32 to switch to 1.8V flash mode and **preventing the device from booting completely** on standard 3.3V flash modules.
+
+**Symptom:** ESP32 does not boot when sensor is connected, boots fine when disconnected.
+
+**Boot Error Logs:**
+If you see errors like:
+```
+invalid header: 0xffffffff
+ets_main.c
+```
+This indicates GPIO12 strapping pin conflict.
+
 ## Value
 Select `onewire` from the GPIO mode dropdown.
 
@@ -20,12 +38,13 @@ Configure a GPIO pin as `onewire` when you want to:
 
 | GPIO | Recommended | Notes |
 |------|-------------|-------|
-| **IO12** | ✅ **Yes** | Fully available (SD D2 unused in 1-bit mode) |
-| **IO13** | ✅ **Yes** | Available with built-in pull-up |
-| **IO3** | ⚠️ Caution | Requires disabling USB logging |
-| **IO1** | ⚠️ Caution | UART TX - requires disabling USB logging |
+| **IO3** | ✅ **YES** | UART RX - requires disabling USB logging |
+| **IO1** | ✅ **YES** | UART TX - requires disabling USB logging |
+| **IO13** | ⚠️ USE WITH CAUTION | May conflict with SD card operations - not recommended |
+| **IO12** | ❌ **NEVER USE** | **STRAPPING PIN** - pull-up will prevent boot! |
+| **IO0** | ❌ **NEVER USE** | Boot mode selection strapping pin |
 
-**Recommended**: IO12 or IO13
+**Recommended**: GPIO3 or GPIO1 (requires disabling USB serial logging)
 
 ## Wiring
 
@@ -35,7 +54,9 @@ DS18B20 Sensor    ESP32-CAM
 --------------    ---------
 VDD       -----> 3.3V
 GND       -----> GND
-DATA      -----> GPIO12 (with 4.7kΩ pull-up to 3.3V)
+DATA      -----> GPIO3 (with 4.7kΩ pull-up to 3.3V) *
+
+* Requires disabling USB serial logging in configuration
 ```
 
 ### Chained DS18B20 (Multiple Sensors)
@@ -73,10 +94,15 @@ Each publishes to MQTT with ROM ID for identification:
 
 ## Safety Considerations
 
-⚠️ **Do NOT use**:
-- IO0 (boot mode selection)
-- IO4 (used for SD card or flash)
-- IO14, IO15 (SD card)
+⚠️ **Do NOT use these pins**:
+- **IO12** - **CRITICAL: Strapping pin!** Pull-up resistor will prevent boot entirely
+- **IO0** - Boot mode selection strapping pin
+- **IO2** - SD card D0
+- **IO4** - SD card D1 / Flash LED
+- **IO14, IO15** - SD card CLK/CMD
+
+⚠️ **USE WITH CAUTION**:
+- **IO13** - May conflict with SD card operations (has internal pull-up enabled)
 
 ## Related Parameters
 
@@ -87,7 +113,8 @@ Each publishes to MQTT with ROM ID for identification:
 
 ```ini
 [GPIO]
-IO12 = onewire
+IO3 = onewire
+# NOTE: USB serial logging must be disabled when using GPIO1/GPIO3
 
 [DS18B20]
 Enable = true
@@ -119,11 +146,17 @@ Alert if:
 
 ## Troubleshooting
 
+**Device won't boot when sensor connected:**
+- **CAUSE**: GPIO12 strapping pin conflict with pull-up resistor
+- **SOLUTION**: Use GPIO3 or GPIO1 instead of GPIO12
+- **Boot error logs**: May show `invalid header: 0xffffffff` or `ets_main.c` errors
+
 **No sensor detected:**
-1. Check wiring and 4.7kΩ pull-up resistor
+1. Check wiring and 4.7kΩ pull-up resistor (to 3.3V, not 5V!)
 2. Verify sensor is DS18B20 (not DHT22 or other)
-3. Test sensor individually before chaining
-4. Check ROM IDs in logs
+3. Confirm USB logging is disabled if using GPIO1/GPIO3
+4. Test sensor individually before chaining
+5. Check ROM IDs in logs
 
 **Intermittent readings:**
 - Cable too long (max ~100m for reliable operation)
