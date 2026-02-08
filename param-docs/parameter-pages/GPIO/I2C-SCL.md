@@ -30,7 +30,7 @@ Configure a GPIO pin as `i2c-scl` when you want to:
 |------|-------------|-------|
 | **IO1** | ✅ **YES** | UART TX - disables USB serial logging |
 | **IO3** | ✅ **YES** | UART RX - disables USB serial logging |
-| **IO13** | ⚠️ CONDITIONAL | Only safe if 1-line SD card mode enabled (`__SD_USE_ONE_LINE_MODE__`) |
+| **IO13** | ✅ **YES** | Safe - 1-line SD mode is active (SD uses only GPIO2, 14, 15) |
 | **IO12** | ❌ **NEVER USE** | **STRAPPING PIN** - pull-up will prevent boot! |
 | **IO0** | ❌ **NEVER USE** | Boot mode selection strapping pin |
 
@@ -38,7 +38,7 @@ Configure a GPIO pin as `i2c-scl` when you want to:
 - SCL: IO1 (with 4.7kΩ pull-up to 3.3V) *disables USB serial logging*
 - SDA: IO3 (with 4.7kΩ pull-up to 3.3V) *disables USB serial logging*
 
-Alternative if 1-line SD mode enabled:
+Alternative (preserves USB serial logging):
 - SCL: IO13 (has built-in pull-up)
 - SDA: IO1 or IO3
 

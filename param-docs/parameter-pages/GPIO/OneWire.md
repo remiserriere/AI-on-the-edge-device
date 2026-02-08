@@ -28,11 +28,11 @@ Configure a GPIO pin as `onewire` when you want to:
 |------|-------------|-------|
 | **IO3** | ✅ **YES** | UART RX - disables USB serial logging |
 | **IO1** | ✅ **YES** | UART TX - disables USB serial logging |
-| **IO13** | ⚠️ USE WITH CAUTION | May conflict with SD card operations - not recommended |
+| **IO13** | ✅ **YES** | Safe - 1-line SD mode is active (SD uses only GPIO2, 14, 15) |
 | **IO12** | ❌ **NEVER USE** | **STRAPPING PIN** - pull-up will prevent boot! |
 | **IO0** | ❌ **NEVER USE** | Boot mode selection strapping pin |
 
-**Recommended**: GPIO3 or GPIO1 (disables USB serial logging)
+**Recommended**: GPIO3 or GPIO1 (disables USB serial logging), or GPIO13 (preserves USB serial logging)
 
 ## Wiring
 
@@ -89,8 +89,8 @@ Each publishes to MQTT with ROM ID for identification:
 - **IO4** - SD card D1 / Flash LED
 - **IO14, IO15** - SD card CLK/CMD
 
-⚠️ **USE WITH CAUTION**:
-- **IO13** - May conflict with SD card operations (has internal pull-up enabled)
+✅ **SAFE TO USE**:
+- **IO13** - Free in 1-line SD mode (has internal pull-up enabled)
 
 ## Related Parameters
 

@@ -309,9 +309,10 @@ Documentation:
    - Impact: Minimal on typical 5-10 minute flow cycles
    - Note: Each sensor with custom interval now runs in its own task (latest version)
 
-2. **GPIO Pins**: Limited to IO1, IO3 (USB logging must be disabled)
+2. **GPIO Pins**: Recommended GPIO1, GPIO3, or GPIO13
    - **GPIO12 MUST NOT be used** - Boot strapping pin causes boot failure with pull-ups
-   - **GPIO13** - Not recommended (SD card conflict)
+   - **GPIO13 is safe** - SD card uses 1-line mode (only GPIO2, 14, 15)
+   - GPIO1/GPIO3 disable USB logging, GPIO13 preserves it
    - Impact: Other GPIOs may conflict with camera/SD
    - Mitigation: Clear documentation of safe pins
 
