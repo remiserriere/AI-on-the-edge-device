@@ -760,9 +760,9 @@ void SensorDS18B20::publishInfluxDB()
     time_t now = time(nullptr);
     
     for (size_t i = 0; i < _temperatures.size(); i++) {
-        // Include ROM ID in field name for sensor identification
+        // Include sensor type and ROM ID in field name for identification
         std::string romIdStr = getRomId(i);
-        std::string field = "temperature_" + romIdStr;
+        std::string field = "ds18b20_" + romIdStr + "_temperature";
         
         influxDB.InfluxDBPublish(_influxMeasurement, 
                                  field, 

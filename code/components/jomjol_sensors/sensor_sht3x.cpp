@@ -330,15 +330,15 @@ void SensorSHT3x::publishInfluxDB()
     
     time_t now = time(nullptr);
     
-    // Publish temperature
+    // Publish temperature with sensor type prefix
     influxDB.InfluxDBPublish(_influxMeasurement, 
-                             "temperature", 
+                             "sht3x_temperature", 
                              std::to_string(_temperature), 
                              now);
     
-    // Publish humidity
+    // Publish humidity with sensor type prefix
     influxDB.InfluxDBPublish(_influxMeasurement, 
-                             "humidity", 
+                             "sht3x_humidity", 
                              std::to_string(_humidity), 
                              now);
     
