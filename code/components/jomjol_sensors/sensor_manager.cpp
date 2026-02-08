@@ -84,94 +84,111 @@ bool SensorBase::shouldRead(int flowInterval)
     return (now - _lastRead) >= interval;
 }
 
-void SensorBase::timerCallback(TimerHandle_t xTimer)
+void SensorBase::sensorTaskWrapper(void* pvParameters)
 {
-    // Get the sensor object from timer ID
-    SensorBase* sensor = static_cast<SensorBase*>(pvTimerGetTimerID(xTimer));
-    if (sensor) {
-        // Trigger a read - this spawns an async task that handles everything
-        sensor->readData();
+    SensorBase* sensor = static_cast<SensorBase*>(pvParameters);
+    sensor->sensorTask();
+}
+
+void SensorBase::sensorTask()
+{
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task started (interval: " + 
+                        std::to_string(_readInterval) + "s)");
+    
+    // Prevent integer overflow: _readInterval (seconds) * 1000 can overflow for large intervals
+    uint64_t intervalMs = (uint64_t)_readInterval * 1000ULL;
+    const uint64_t maxSafeMs = (uint64_t)UINT32_MAX * 1000ULL / configTICK_RATE_HZ;
+    if (intervalMs > maxSafeMs) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Interval exceeds maximum, capping to " + 
+                            std::to_string(maxSafeMs / 1000) + "s");
+        intervalMs = maxSafeMs;
+    }
+    const TickType_t xDelay = pdMS_TO_TICKS(intervalMs);
+    
+    // Initial delay before first read
+    TickType_t initialDelay = xDelay;
+    if (_readInterval > 300) {  // If interval > 5 minutes, use shorter initial delay
+        initialDelay = pdMS_TO_TICKS(30000);
+    }
+    
+    float delaySeconds = (float)initialDelay / (float)configTICK_RATE_HZ;
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Waiting " + std::to_string((int)delaySeconds) + 
+                        "s before first read");
+    
+    // Power-efficient sleep - completely yields CPU
+    vTaskDelay(initialDelay);
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Starting main loop (reads every " + 
+                        std::to_string(_readInterval) + "s)");
+    
+    int iteration = 0;
+    while (true) {
+        iteration++;
+        
+        // Minimal logging to conserve resources
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Iteration " + std::to_string(iteration));
+        
+        // Trigger async read (spawns separate task, returns immediately)
+        bool readStarted = readData();
+        if (!readStarted) {
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read busy, skipped");
+        }
+        
+        // Power-efficient sleep - task yields CPU completely
+        // Zero CPU usage while sleeping, very power efficient
+        vTaskDelay(xDelay);
     }
 }
 
 bool SensorBase::startPeriodicTask()
 {
-    // Only create timer if we have a custom interval (not follow flow mode)
-    // _readInterval = -1 means "follow flow" - sensor will be read by SensorManager::update()
-    // _readInterval > 0 means custom interval - sensor needs its own timer
+    // Only create task for custom intervals
+    // _readInterval = -1 means "follow flow" mode - handled by SensorManager::update()
+    // _readInterval > 0 means custom interval - needs dedicated task
     if (_readInterval <= 0) {
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensor using follow-flow mode, no periodic timer needed");
-        return true;  // Not an error, just not applicable
-    }
-    
-    if (_timerHandle != nullptr) {
-        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Timer already running");
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Using follow-flow mode, no periodic task");
         return true;
     }
     
-    // Calculate period in ticks
-    uint64_t intervalMs = (uint64_t)_readInterval * 1000ULL;
-    const uint64_t maxSafeMs = (uint64_t)UINT32_MAX * 1000ULL / configTICK_RATE_HZ;
-    if (intervalMs > maxSafeMs) {
-        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Interval " + std::to_string(_readInterval) + 
-                            "s exceeds maximum, capping to " + std::to_string(maxSafeMs / 1000) + "s");
-        intervalMs = maxSafeMs;
-    }
-    const TickType_t xPeriod = pdMS_TO_TICKS(intervalMs);
-    
-    // Determine initial delay
-    TickType_t initialDelay = xPeriod;
-    if (_readInterval > 300) {  // If interval > 5 minutes
-        initialDelay = pdMS_TO_TICKS(30000);  // Use 30 second initial delay
+    if (_taskHandle != nullptr) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Task already running");
+        return true;
     }
     
-    // Create auto-reload timer that will fire repeatedly
-    _timerHandle = xTimerCreate(
-        "sensor_tmr",           // Timer name (debug only)
-        xPeriod,                // Period in ticks (for subsequent fires)
-        pdTRUE,                 // Auto-reload (repeating timer)
-        this,                   // Timer ID (pass sensor object)
-        &SensorBase::timerCallback  // Callback function
+    // Create task at IDLE priority to ensure it never blocks main digitalization flow
+    // This is critical for power and CPU efficiency
+    BaseType_t xReturned = xTaskCreatePinnedToCore(
+        &SensorBase::sensorTaskWrapper,
+        "sensor",              // Short name to save memory
+        4096,                  // Stack size
+        this,                  // Pass sensor object
+        tskIDLE_PRIORITY,      // LOWEST priority - never blocks main flow
+        &_taskHandle,
+        0                      // Core 0
     );
     
-    if (_timerHandle == nullptr) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to create periodic timer");
+    if (xReturned != pdPASS) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to create periodic task");
+        _taskHandle = nullptr;
         return false;
     }
     
-    // Start the timer with initial delay
-    // Note: xTimerStart uses period from timer creation, not a custom delay
-    // For custom initial delay, we need to change period temporarily
-    if (initialDelay != xPeriod) {
-        xTimerChangePeriod(_timerHandle, initialDelay, 0);
-    }
-    
-    if (xTimerStart(_timerHandle, 0) != pdPASS) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to start periodic timer");
-        xTimerDelete(_timerHandle, 0);
-        _timerHandle = nullptr;
-        return false;
-    }
-    
-    // If we used a custom initial delay, reset to normal period after first fire
-    // This will be handled automatically after first callback if we change period back
-    
-    float delaySeconds = (float)initialDelay / (float)configTICK_RATE_HZ;
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Started periodic timer (interval: " + 
-                        std::to_string(_readInterval) + "s, first read in " + 
-                        std::to_string((int)delaySeconds) + "s)");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Created periodic task (interval: " + 
+                        std::to_string(_readInterval) + "s, priority: IDLE)");
     return true;
 }
 
 void SensorBase::stopPeriodicTask()
 {
-    if (_timerHandle != nullptr) {
-        TimerHandle_t timerToDelete = _timerHandle;
-        _timerHandle = nullptr;  // Clear handle first to prevent issues
+    if (_taskHandle != nullptr) {
+        TaskHandle_t taskToDelete = _taskHandle;
+        _taskHandle = nullptr;  // Clear atomically to prevent double-delete
         
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Stopping periodic timer");
-        xTimerStop(timerToDelete, portMAX_DELAY);  // Stop timer
-        xTimerDelete(timerToDelete, portMAX_DELAY);  // Delete timer
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Stopping periodic task");
+        vTaskDelete(taskToDelete);
+        
+        // Small delay to let scheduler cleanup
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
