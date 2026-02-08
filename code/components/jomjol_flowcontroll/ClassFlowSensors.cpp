@@ -190,9 +190,10 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
             // DS18B20-specific parameters
             if (param == "EXPECTEDSENSORS") {
                 if (safeParseInt(value, config.expectedSensors)) {
+                    // Validate: must be -1 (auto-detect) or positive integer (>0)
                     if (config.expectedSensors < -1 || config.expectedSensors == 0) {
                         LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20: ExpectedSensors must be -1 (auto-detect) or positive, got: " + value);
-                        config.expectedSensors = -1;
+                        config.expectedSensors = -1;  // Fallback to auto-detect
                     }
                 } else {
                     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "DS18B20: Invalid ExpectedSensors value: " + value);

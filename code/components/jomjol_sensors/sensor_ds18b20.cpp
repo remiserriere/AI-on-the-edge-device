@@ -448,8 +448,8 @@ bool SensorDS18B20::init()
         }
     }
     
-    // Use best result if we didn't get the expected count
-    if (deviceCount != _expectedSensors && bestDeviceCount > 0) {
+    // Use best result if we didn't get the expected count (only when ExpectedSensors is configured)
+    if (_expectedSensors > 0 && deviceCount != _expectedSensors && bestDeviceCount > 0) {
         LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Using best ROM search result: " + 
                             std::to_string(bestDeviceCount) + " sensor(s)");
         _romIds = bestRomIds;
