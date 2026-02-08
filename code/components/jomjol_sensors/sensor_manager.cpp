@@ -95,7 +95,7 @@ void SensorBase::sensorTask()
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task started for sensor: " + getName() + 
                         " (interval: " + std::to_string(_readInterval) + "s)");
     
-    const TickType_t xDelay = (_readInterval * 1000) / portTICK_PERIOD_MS;
+    const TickType_t xDelay = pdMS_TO_TICKS(_readInterval * 1000);
     
     while (true) {
         // Read sensor data
