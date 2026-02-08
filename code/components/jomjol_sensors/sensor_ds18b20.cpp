@@ -501,7 +501,8 @@ void SensorDS18B20::readTaskWrapper(void* pvParameters)
 
 void SensorDS18B20::readTask()
 {
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Background read task started");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 background read task started for " + 
+                        std::to_string(_romIds.size()) + " sensor(s)");
     
     // Read all sensors with retry logic
     const int maxRetries = 5;  // Increased from 3 to 5 for better transient error handling
@@ -583,6 +584,8 @@ void SensorDS18B20::readTask()
     if (anySuccess) {
         _lastRead = time(nullptr);
         
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 read completed successfully, publishing data");
+        
         // Publish data from background task after successful read
         publishMQTT();
         publishInfluxDB();
@@ -635,7 +638,7 @@ bool SensorDS18B20::readData()
         return false;
     }
     
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Started background read task (true async)");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 readData() spawned async read task successfully");
     
     // Return true to indicate read was initiated
     // The task will complete in background
@@ -681,9 +684,23 @@ int SensorDS18B20::scanDevices()
 void SensorDS18B20::publishMQTT()
 {
 #ifdef ENABLE_MQTT
-    if (!_mqttEnabled || !getMQTTisConnected()) {
+    if (!_mqttEnabled) {
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "MQTT publishing disabled for DS18B20");
         return;
     }
+    
+    if (!getMQTTisConnected()) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Cannot publish DS18B20 to MQTT: not connected");
+        return;
+    }
+    
+    if (_temperatures.empty()) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Cannot publish DS18B20 to MQTT: no sensor data");
+        return;
+    }
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Publishing " + std::to_string(_temperatures.size()) + 
+                        " DS18B20 sensor(s) to MQTT");
     
     for (size_t i = 0; i < _temperatures.size(); i++) {
         // Determine base topic: use main topic if config topic is empty, otherwise use config topic
@@ -706,6 +723,8 @@ void SensorDS18B20::publishMQTT()
         
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Published to MQTT: " + topic + " = " + value);
     }
+#else
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "MQTT not compiled in (ENABLE_MQTT not defined)");
 #endif
 }
 

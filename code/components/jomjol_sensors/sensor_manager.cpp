@@ -112,13 +112,23 @@ void SensorBase::sensorTask()
         initialDelay = pdMS_TO_TICKS(30000);  // Use 30 second initial delay instead
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Using 30s initial delay for long interval sensor: " + getName());
     }
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task for sensor " + getName() + 
+                        " waiting " + std::to_string(initialDelay / configTICK_RATE_HZ) + 
+                        "s before first read");
     vTaskDelay(initialDelay);
     
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task for sensor " + getName() + 
+                        " starting main loop (will read every " + std::to_string(_readInterval) + "s)");
+    
+    int iteration = 0;
     while (true) {
+        iteration++;
         // Read sensor data
         // Note: readData() spawns an async task that handles publishing
         // Don't publish here to avoid double-publishing
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Periodic task iteration for sensor: " + getName());
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task iteration #" + std::to_string(iteration) + 
+                            " for sensor: " + getName());
         
         bool readStarted = readData();
         if (!readStarted) {
@@ -126,6 +136,8 @@ void SensorBase::sensorTask()
                                 " (previous read still in progress or sensor not initialized)");
         }
         
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task for sensor " + getName() + 
+                            " sleeping for " + std::to_string(_readInterval) + "s");
         vTaskDelay(xDelay);
     }
 }
