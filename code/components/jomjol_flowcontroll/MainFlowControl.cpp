@@ -24,6 +24,10 @@
 #include "ClassLogFile.h"
 #include "server_GPIO.h"
 
+#ifdef ENABLE_MQTT
+#include "server_mqtt.h"
+#endif
+
 #include "server_file.h"
 
 #include "read_wlanini.h"
@@ -138,6 +142,15 @@ void doInit(void)
             if (flow && flow->name() == "ClassFlowSensors") {
                 ClassFlowSensors* sensorFlow = static_cast<ClassFlowSensors*>(flow);
                 sensorFlow->initializeEarly();
+                
+                #ifdef ENABLE_MQTT
+                // Set the sensor manager reference for MQTT HomeAssistant Discovery
+                if (sensorFlow->getSensorManager()) {
+                    mqttServer_setSensorManager(sensorFlow->getSensorManager());
+                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Sensor manager set for MQTT HomeAssistant Discovery");
+                }
+                #endif
+                
                 break;
             }
         }

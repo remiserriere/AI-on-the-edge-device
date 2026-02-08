@@ -14,6 +14,11 @@
 #include "../../include/defines.h"
 #include "basic_auth.h"
 
+// Include sensor manager for HomeAssistant Discovery
+#include "../jomjol_sensors/sensor_manager.h"
+#include "../jomjol_sensors/sensor_sht3x.h"
+#include "../jomjol_sensors/sensor_ds18b20.h"
+
 
 
 static const char *TAG = "MQTT SERVER";
@@ -25,6 +30,7 @@ extern const char* libfive_git_branch(void);
 extern std::string getFwVersion(void);
 
 std::vector<NumberPost*>* NUMBERS;
+SensorManager* sensorManager = nullptr;
 bool HomeassistantDiscovery = false;
 std::string meterType = "";
 std::string valueUnit = "";
@@ -42,6 +48,10 @@ void mqttServer_setParameter(std::vector<NumberPost*>* _NUMBERS, int _keepAlive,
     NUMBERS = _NUMBERS;
     keepAlive = _keepAlive;
     roundInterval = _roundInterval; 
+}
+
+void mqttServer_setSensorManager(SensorManager* _sensorManager) {
+    sensorManager = _sensorManager;
 }
 
 void mqttServer_setMeterType(std::string _meterType, std::string _valueUnit, std::string _timeUnit,std::string _rateUnit) {
@@ -223,6 +233,41 @@ bool MQTThomeassistantDiscovery(int qos) {
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "timestamp",                  "Timestamp",                            "clock-time-eight-outline",  "",                    "timestamp",       "",                 "diagnostic",     qos);
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "json",                       "JSON",                                 "code-json",                 "",                    "",                "",                 "diagnostic",     qos);
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "problem",                    "Problem",                              "alert-outline",             "",                    "problem",         "",                 "",               qos); // Special binary sensor which is based on error topic
+    }
+
+    // Publish HomeAssistant Discovery for external sensors (SHT3x, DS18B20)
+    if (sensorManager && sensorManager->isEnabled()) {
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HomeAssistant Discovery topics for external sensors...");
+        
+        const auto& sensors = sensorManager->getSensors();
+        for (const auto& sensor : sensors) {
+            if (sensor->getName() == "SHT3x") {
+                auto* sht3x = static_cast<SensorSHT3x*>(sensor.get());
+                if (sht3x) {
+                    // SHT3x Temperature sensor
+                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "temperature", 
+                        "SHT3x Temperature", "thermometer", "°C", "temperature", "measurement", "", qos);
+                    
+                    // SHT3x Humidity sensor
+                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "humidity", 
+                        "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos);
+                }
+            }
+            else if (sensor->getName() == "DS18B20") {
+                auto* ds18b20 = static_cast<SensorDS18B20*>(sensor.get());
+                if (ds18b20) {
+                    int count = ds18b20->getSensorCount();
+                    for (int i = 0; i < count; i++) {
+                        std::string romId = ds18b20->getRomId(i);
+                        
+                        // Create discovery topic for each DS18B20 sensor
+                        // Using ROM ID as unique identifier
+                        allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(romId, "temperature",
+                            "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos);
+                    }
+                }
+            }
+        }
     }
 
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Successfully published all Homeassistant Discovery MQTT topics");
