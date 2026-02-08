@@ -201,9 +201,11 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
         "\"payload_available\": \"" + LWT_CONNECTED + "\","  +
         "\"payload_not_available\": \"" + LWT_DISCONNECTED + "\",";
 
+    // Device info: Always use maintopic for identifiers and name to ensure all sensors
+    // (including external ones with custom MQTT topics) are grouped under the parent device
     payload += string("\"device\": {")  +
-        "\"identifiers\": [\"" + baseTopic + "\"],"  +
-        "\"name\": \"" + baseTopic + "\","  +
+        "\"identifiers\": [\"" + maintopic + "\"],"  +
+        "\"name\": \"" + maintopic + "\","  +
         "\"model\": \"Meter Digitizer\","  +
         "\"manufacturer\": \"AI on the Edge Device\","  +
       "\"sw_version\": \"" + version + "\","  +
