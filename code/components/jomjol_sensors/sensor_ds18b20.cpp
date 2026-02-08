@@ -501,9 +501,10 @@ void SensorDS18B20::readTaskWrapper(void* pvParameters)
 
 void SensorDS18B20::readTask()
 {
-    time_t taskStartTime = time(nullptr);
+    // Use tick-based timing instead of time() which returns epoch (1970) on cold boot before NTP sync
+    TickType_t taskStartTicks = xTaskGetTickCount();
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 background read task started for " + 
-                        std::to_string(_romIds.size()) + " sensor(s) at " + std::to_string(taskStartTime));
+                        std::to_string(_romIds.size()) + " sensor(s)");
     
     // Read all sensors with retry logic
     const int maxRetries = 5;  // Increased from 3 to 5 for better transient error handling
@@ -582,24 +583,29 @@ void SensorDS18B20::readTask()
     
     _readSuccess = anySuccess;
     
-    time_t taskEndTime = time(nullptr);
-    int taskDuration = (int)(taskEndTime - taskStartTime);
+    // Calculate task duration using ticks (works even when time() returns epoch on cold boot)
+    TickType_t taskEndTicks = xTaskGetTickCount();
+    TickType_t taskDurationTicks = taskEndTicks - taskStartTicks;
+    int taskDurationSeconds = taskDurationTicks / configTICK_RATE_HZ;
     
     if (anySuccess) {
         _lastRead = time(nullptr);
         
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 read completed successfully in " + 
-                            std::to_string(taskDuration) + "s, publishing data");
+                            std::to_string(taskDurationSeconds) + "s, publishing data");
         
         // Publish data from background task after successful read
         publishMQTT();
         publishInfluxDB();
         
+        // Calculate total time including publishing
+        TickType_t totalTicks = xTaskGetTickCount() - taskStartTicks;
+        int totalSeconds = totalTicks / configTICK_RATE_HZ;
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 async task finished - clearing handle and exiting (total time: " + 
-                            std::to_string((int)(time(nullptr) - taskStartTime)) + "s)");
+                            std::to_string(totalSeconds) + "s)");
     } else {
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Background read task failed to read any sensors after " + 
-                            std::to_string(taskDuration) + "s");
+                            std::to_string(taskDurationSeconds) + "s");
     }
     
     // Clear handle before deleting task to prevent race condition

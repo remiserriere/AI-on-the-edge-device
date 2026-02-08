@@ -124,8 +124,10 @@ void SensorBase::sensorTask()
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Using 30s initial delay for long interval sensor: " + sensorName);
     }
     
-    // Calculate delay in seconds for logging (use float to avoid truncation)
-    float initialDelaySeconds = (float)initialDelay * 1000.0f / (float)configTICK_RATE_HZ;
+    // Calculate delay in seconds for logging
+    // initialDelay is in ticks, configTICK_RATE_HZ is ticks per second
+    // So: seconds = ticks / (ticks/second)
+    float initialDelaySeconds = (float)initialDelay / (float)configTICK_RATE_HZ;
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Waiting " + std::to_string((int)initialDelaySeconds) + 
                         "s before first read for sensor: " + sensorName);
     vTaskDelay(initialDelay);
