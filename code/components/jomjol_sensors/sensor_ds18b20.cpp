@@ -589,6 +589,8 @@ void SensorDS18B20::readTask()
     int taskDurationSeconds = taskDurationTicks / configTICK_RATE_HZ;
     
     if (anySuccess) {
+        // Update last read time using time(nullptr) for consistency with shouldRead()
+        // Note: On cold boot before NTP, this is seconds since boot, which is fine for interval checking
         _lastRead = time(nullptr);
         
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DS18B20 read completed successfully in " + 
