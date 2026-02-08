@@ -105,9 +105,6 @@ public:
     void InfluxDBdestroy();
     // Publish data to the InfluxDB server
     void InfluxDBPublish(std::string _measurement, std::string _key, std::string _content, long int _timeUTC);
-    
-    // Check if InfluxDB is configured with a valid URI
-    bool isConfigured() const { return !influxDBURI.empty(); }
 };
 
 

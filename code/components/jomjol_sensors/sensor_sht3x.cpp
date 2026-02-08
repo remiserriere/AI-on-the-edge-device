@@ -326,12 +326,6 @@ void SensorSHT3x::publishInfluxDB()
         return;
     }
     
-    // Check if InfluxDB is configured with a valid URI before attempting to publish
-    if (!influxDB.isConfigured()) {
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "InfluxDB not configured, skipping publish");
-        return;
-    }
-    
     time_t now = time(nullptr);
     
     // Publish temperature
