@@ -128,14 +128,23 @@ void SensorBase::sensorTask()
         // Minimal logging to conserve resources
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Iteration " + std::to_string(iteration));
         
-        // Trigger async read (spawns separate task, returns immediately)
-        bool readStarted = readData();
-        if (!readStarted) {
-            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read busy, skipped");
+        // Failproof: Always execute delay even if read fails
+        // This ensures task keeps running and schedules next read regardless of errors
+        try {
+            // Trigger async read (spawns separate task, returns immediately)
+            bool readStarted = readData();
+            if (!readStarted) {
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Read busy or failed, will retry next iteration");
+            }
+        } catch (...) {
+            // Catch any exception to prevent task from crashing
+            // Task will continue and retry on next iteration
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Exception in readData, will retry next iteration");
         }
         
         // Power-efficient sleep - task yields CPU completely
         // Zero CPU usage while sleeping, very power efficient
+        // ALWAYS execute delay to ensure task continues scheduling reads
         vTaskDelay(xDelay);
     }
 }

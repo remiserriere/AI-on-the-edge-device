@@ -107,11 +107,6 @@ private:
      * @brief Periodic task function for reading sensor
      */
     void sensorTask();
-    
-    /**
-     * @brief Periodic task function for reading sensor
-     */
-    void sensorTask();
 };
 
 /**
