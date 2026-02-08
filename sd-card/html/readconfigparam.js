@@ -264,12 +264,14 @@ function ParseConfig() {
     category[catname]["enabled"] = false;
     category[catname]["found"] = false;
     param[catname] = new Object();
+    ParamAddValue(param, catname, "ExpectedSensors");
     ParamAddValue(param, catname, "Interval");
     ParamAddValue(param, catname, "MQTT_Enable");
     ParamAddValue(param, catname, "MQTT_Topic");
     ParamAddValue(param, catname, "InfluxDB_Enable");
     ParamAddValue(param, catname, "InfluxDB_Measurement");
     // Default values for DS18B20 sensor
+    param[catname]["ExpectedSensors"]["value1"] = "-1";
     param[catname]["Interval"]["value1"] = "-1";
     param[catname]["MQTT_Enable"]["value1"] = "true";
     param[catname]["MQTT_Topic"]["value1"] = "sensors/temperature";
