@@ -3,47 +3,78 @@
 Set the base MQTT topic for publishing DS18B20 temperature readings.
 
 ## Value
-Default: `enclosure/temperature`
+Default: (empty - uses `MainTopic/ds18b20`)
 
 String value representing the base topic path. Each sensor's ROM ID is appended to create unique topics.
+
+Variables like `$main_topic` can be used for dynamic topic construction.
 
 ## Description
 
 The MQTT topic defines where temperature readings are published. For multiple DS18B20 sensors, each sensor publishes to a unique subtopic using its ROM ID.
 
+**Important**: This topic is also used by Home Assistant Discovery (HAD) to advertise sensors. If you configure a custom MQTT topic, HAD will use it to ensure Home Assistant can find your sensor data.
+
 ## Topic Structure
 
 ### Format
 ```
-{MainTopic}/{MQTT_Topic}/{ROM_ID}
+{MQTT_Topic}/{ROM_ID}/temperature
 ```
 
 Where:
-- `MainTopic`: Global MQTT topic prefix (from MQTT settings)
-- `MQTT_Topic`: This parameter (DS18B20 base topic)
+- `MQTT_Topic`: This parameter (DS18B20 base topic, defaults to `MainTopic/ds18b20` if empty)
 - `ROM_ID`: Unique 64-bit ROM ID of each sensor (format: 28-XXXXXXXXXXXX)
 
 ### Examples
 
-**Single Sensor:**
+**Default Configuration (empty MQTT_Topic):**
 ```ini
 [MQTT]
 MainTopic = watermeter
 
 [DS18B20]
-MQTT_Topic = enclosure/temperature
+MQTT_Topic = 
 ```
 
 Publishes to:
 ```
-watermeter/enclosure/temperature/28-0123456789AB
+watermeter/ds18b20/28-0123456789AB/temperature
+```
+
+**Custom Topic:**
+```ini
+[MQTT]
+MainTopic = watermeter
+
+[DS18B20]
+MQTT_Topic = /qwe/ds18b
+```
+
+Publishes to:
+```
+/qwe/ds18b/28-0123456789AB/temperature
+```
+
+**Using Variable Substitution:**
+```ini
+[MQTT]
+MainTopic = watermeter
+
+[DS18B20]
+MQTT_Topic = $main_topic/sensors/temperature
+```
+
+Publishes to:
+```
+watermeter/sensors/temperature/28-0123456789AB/temperature
 ```
 
 **Multiple Sensors (3 sensors):**
 ```
-watermeter/enclosure/temperature/28-0123456789AB → 24.5  (Inside)
-watermeter/enclosure/temperature/28-FEDCBA987654 → 15.2  (Outside)
-watermeter/enclosure/temperature/28-AABBCCDD1122 → 12.8  (Pipe)
+watermeter/ds18b20/28-0123456789AB/temperature → 24.5  (Inside)
+watermeter/ds18b20/28-FEDCBA987654/temperature → 15.2  (Outside)
+watermeter/ds18b20/28-AABBCCDD1122/temperature → 12.8  (Pipe)
 ```
 
 ## Topic Naming Conventions
@@ -97,7 +128,29 @@ sensors/humidity/enclosure
 
 ## Home Assistant Integration
 
-### Sensor Configuration
+### Auto-Discovery
+
+When **Home Assistant Discovery** is enabled in MQTT settings, sensors are automatically discovered using the configured MQTT topic:
+
+```ini
+[MQTT]
+MainTopic = watermeter
+HomeassistantDiscovery = true
+
+[DS18B20]
+MQTT_Topic = /custom/sensors/temp
+```
+
+Home Assistant will automatically create sensors at:
+```
+sensor.custom_sensors_temp_ds18b20_28_0123456789ab_temperature
+```
+
+**Important**: The discovery announcement uses your custom `MQTT_Topic` to match where data is actually published. If you change `MQTT_Topic`, you must:
+1. Restart the device to regenerate HAD announcements
+2. Or trigger republishing via the web interface (`Settings > MQTT > Publish Discovery`)
+
+### Manual Configuration
 
 Match your topic in Home Assistant:
 

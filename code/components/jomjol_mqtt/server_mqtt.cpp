@@ -71,6 +71,19 @@ std::string createNodeId(std::string &topic) {
     return (splitPos == std::string::npos) ? topic : topic.substr(splitPos + 1);
 }
 
+/**
+ * Helper function to determine the base MQTT topic for external sensors
+ * @param customTopic The custom MQTT topic configured for the sensor (may be empty)
+ * @param sensorType The sensor type (e.g., "sht3x", "ds18b20")
+ * @return The base topic to use (custom if configured, otherwise maintopic/sensorType)
+ */
+std::string getSensorBaseTopic(const std::string& customTopic, const std::string& sensorType) {
+    if (customTopic.empty()) {
+        return maintopic + "/" + sensorType;
+    }
+    return customTopic;
+}
+
 bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
     std::string name, std::string icon, std::string unit, std::string deviceClass, std::string stateClass, std::string entityCategory,
     int qos, std::string customBaseTopic = "") {
@@ -117,16 +130,16 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
      * if the main topic is embedded in a nested structure, we just use the last part as node_id 
      * This means a maintopic "home/test/watermeter" is transformed to the discovery topic "homeassistant/sensor/watermeter/..."
     */
-    std::string baseTopic = customBaseTopic.empty() ? maintopic : customBaseTopic;
-    std::string node_id = createNodeId(baseTopic);
+    std::string discoveryBaseTopic = customBaseTopic.empty() ? maintopic : customBaseTopic;
+    std::string node_id = createNodeId(discoveryBaseTopic);
     topicFull = "homeassistant/" + component + "/" + node_id + "/" + configTopic + "/config";
     
     /* See https://www.home-assistant.io/docs/mqtt/discovery/ */
     payload = string("{")  +
-        "\"~\": \"" + baseTopic + "\","  +
-        "\"unique_id\": \"" + baseTopic + "-" + configTopic + "\","  +
-        "\"object_id\": \"" + baseTopic + "_" + configTopic + "\","  + // Default entity ID; required for HA <= 2025.10
-        "\"default_entity_id\": \"" + component + "." + baseTopic + "_" + configTopic + "\"," + // Default entity ID; required in HA >=2026.4
+        "\"~\": \"" + discoveryBaseTopic + "\","  +
+        "\"unique_id\": \"" + discoveryBaseTopic + "-" + configTopic + "\","  +
+        "\"object_id\": \"" + discoveryBaseTopic + "_" + configTopic + "\","  + // Default entity ID; required for HA <= 2025.10
+        "\"default_entity_id\": \"" + component + "." + discoveryBaseTopic + "_" + configTopic + "\"," + // Default entity ID; required in HA >=2026.4
         "\"name\": \"" + name + "\","  +
         "\"icon\": \"mdi:" + icon + "\",";        
 
@@ -174,8 +187,8 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
         "\"payload_not_available\": \"" + LWT_DISCONNECTED + "\",";
 
     payload += string("\"device\": {")  +
-        "\"identifiers\": [\"" + baseTopic + "\"],"  +
-        "\"name\": \"" + baseTopic + "\","  +
+        "\"identifiers\": [\"" + discoveryBaseTopic + "\"],"  +
+        "\"name\": \"" + discoveryBaseTopic + "\","  +
         "\"model\": \"Meter Digitizer\","  +
         "\"manufacturer\": \"AI on the Edge Device\","  +
       "\"sw_version\": \"" + version + "\","  +
@@ -262,18 +275,8 @@ bool MQTThomeassistantDiscovery(int qos) {
                 // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
                 auto* sht3x = static_cast<SensorSHT3x*>(sensor.get());
                 
-                // Get custom MQTT topic from sensor configuration
-                std::string sensorMqttTopic = sensor->getMqttTopic();
-                
-                // Determine base topic for HAD
-                std::string baseTopic;
-                if (sensorMqttTopic.empty()) {
-                    // Use main topic with "sht3x" subfolder as default
-                    baseTopic = maintopic + "/sht3x";
-                } else {
-                    // Use custom topic configured for this sensor
-                    baseTopic = sensorMqttTopic;
-                }
+                // Get custom MQTT topic from sensor configuration and determine base topic for HAD
+                std::string baseTopic = getSensorBaseTopic(sensor->getMqttTopic(), "sht3x");
                 
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for SHT3x sensor with base topic: " + baseTopic);
                 
@@ -292,24 +295,14 @@ bool MQTThomeassistantDiscovery(int qos) {
                 // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
                 auto* ds18b20 = static_cast<SensorDS18B20*>(sensor.get());
                 
-                // Get custom MQTT topic from sensor configuration
-                std::string sensorMqttTopic = sensor->getMqttTopic();
+                // Get custom MQTT topic from sensor configuration and determine base topic for HAD
+                std::string baseTopic = getSensorBaseTopic(sensor->getMqttTopic(), "ds18b20");
                 
                 int count = ds18b20->getSensorCount();
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for " + std::to_string(count) + " DS18B20 sensor(s)");
                 
                 for (int i = 0; i < count; i++) {
                     std::string romId = ds18b20->getRomId(i);
-                    
-                    // Determine base topic for HAD
-                    std::string baseTopic;
-                    if (sensorMqttTopic.empty()) {
-                        // Use main topic with "ds18b20" subfolder as default
-                        baseTopic = maintopic + "/ds18b20";
-                    } else {
-                        // Use custom topic configured for this sensor
-                        baseTopic = sensorMqttTopic;
-                    }
                     
                     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for DS18B20 " + romId + " with base topic: " + baseTopic);
                     
