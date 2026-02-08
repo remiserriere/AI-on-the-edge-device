@@ -6,6 +6,7 @@
 
 #ifdef ENABLE_MQTT
 #include "interface_mqtt.h"
+#include "server_mqtt.h"
 #endif
 
 #ifdef ENABLE_INFLUXDB
@@ -683,17 +684,17 @@ void SensorDS18B20::publishMQTT()
     }
     
     for (size_t i = 0; i < _temperatures.size(); i++) {
-        std::string topic = _mqttTopic;
+        // Determine base topic: use main topic if config topic is empty, otherwise use config topic
+        std::string baseTopic;
+        if (_mqttTopic.empty()) {
+            baseTopic = mqttServer_getMainTopic();
+        } else {
+            baseTopic = _mqttTopic;
+        }
         
         // Include ROM ID in topic for sensor identification
         std::string romIdStr = getRomId(i);
-        if (_temperatures.size() > 1) {
-            // For multiple sensors, append ROM ID to topic
-            topic += "/" + romIdStr;
-        } else {
-            // For single sensor, optionally append ROM ID
-            topic += "/" + romIdStr;
-        }
+        std::string topic = baseTopic + "/" + romIdStr;
         
         std::string value = std::to_string(_temperatures[i]);
         MQTTPublish(topic, value, 1, true);
