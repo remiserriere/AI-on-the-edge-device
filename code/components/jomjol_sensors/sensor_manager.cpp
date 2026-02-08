@@ -97,9 +97,17 @@ void SensorBase::sensorTask()
     
     // Prevent integer overflow: _readInterval (seconds) * 1000 can overflow for large intervals
     // Cast to uint64_t first, then convert to ticks
-    // Note: If result exceeds TickType_t max (typically uint32_t), it will be truncated
-    // Maximum safe interval is UINT32_MAX / configTICK_RATE_HZ seconds (typically ~49 days at 1ms tick)
     uint64_t intervalMs = (uint64_t)_readInterval * 1000ULL;
+    
+    // Validate interval doesn't exceed TickType_t range
+    // configTICK_RATE_HZ is ticks per second, so max ms = UINT32_MAX / (configTICK_RATE_HZ / 1000)
+    const uint64_t maxSafeMs = (uint64_t)UINT32_MAX * 1000ULL / configTICK_RATE_HZ;
+    if (intervalMs > maxSafeMs) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Interval " + std::to_string(_readInterval) + 
+                            "s exceeds maximum safe value, capping to " + std::to_string(maxSafeMs / 1000) + "s");
+        intervalMs = maxSafeMs;
+    }
+    
     const TickType_t xDelay = pdMS_TO_TICKS(intervalMs);
     
     // Add initial delay before first read to:
@@ -113,8 +121,10 @@ void SensorBase::sensorTask()
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Using 30s initial delay for long interval sensor: " + getName());
     }
     
+    // Calculate delay in seconds for logging (use float to avoid truncation)
+    float initialDelaySeconds = (float)initialDelay * 1000.0f / (float)configTICK_RATE_HZ;
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic task for sensor " + getName() + 
-                        " waiting " + std::to_string(initialDelay / configTICK_RATE_HZ) + 
+                        " waiting " + std::to_string((int)initialDelaySeconds) + 
                         "s before first read");
     vTaskDelay(initialDelay);
     
