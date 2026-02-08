@@ -97,13 +97,22 @@ void SensorBase::sensorTask()
     
     // Prevent integer overflow: _readInterval (seconds) * 1000 can overflow for large intervals
     // Cast to uint64_t first, then convert to ticks
-    const TickType_t xDelay = pdMS_TO_TICKS((uint64_t)_readInterval * 1000ULL);
+    // Note: If result exceeds TickType_t max (typically uint32_t), it will be truncated
+    // Maximum safe interval is UINT32_MAX / configTICK_RATE_HZ seconds (typically ~49 days at 1ms tick)
+    uint64_t intervalMs = (uint64_t)_readInterval * 1000ULL;
+    const TickType_t xDelay = pdMS_TO_TICKS(intervalMs);
     
     // Add initial delay before first read to:
     // 1. Allow system to fully stabilize after initialization
     // 2. Stagger sensor reads across different intervals
     // 3. Avoid immediate collision with async init tasks
-    vTaskDelay(xDelay);
+    // Use a shorter delay for long intervals to get first reading sooner
+    TickType_t initialDelay = xDelay;
+    if (_readInterval > 300) {  // If interval > 5 minutes
+        initialDelay = pdMS_TO_TICKS(30000);  // Use 30 second initial delay instead
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Using 30s initial delay for long interval sensor: " + getName());
+    }
+    vTaskDelay(initialDelay);
     
     while (true) {
         // Read sensor data
