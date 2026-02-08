@@ -242,33 +242,31 @@ bool MQTThomeassistantDiscovery(int qos) {
         const auto& sensors = sensorManager->getSensors();
         for (const auto& sensor : sensors) {
             if (sensor->getName() == "SHT3x") {
-                auto* sht3x = dynamic_cast<SensorSHT3x*>(sensor.get());
-                if (sht3x) {
-                    // SHT3x Temperature sensor
-                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "temperature", 
-                        "SHT3x Temperature", "thermometer", "°C", "temperature", "measurement", "", qos);
-                    
-                    // SHT3x Humidity sensor
-                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "humidity", 
-                        "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos);
-                } else {
-                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to cast sensor to SHT3x despite name match - skipping discovery");
-                }
+                // Safe to use static_cast here because getName() guarantees the type
+                // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
+                auto* sht3x = static_cast<SensorSHT3x*>(sensor.get());
+                
+                // SHT3x Temperature sensor
+                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "temperature", 
+                    "SHT3x Temperature", "thermometer", "°C", "temperature", "measurement", "", qos);
+                
+                // SHT3x Humidity sensor
+                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "humidity", 
+                    "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos);
             }
             else if (sensor->getName() == "DS18B20") {
-                auto* ds18b20 = dynamic_cast<SensorDS18B20*>(sensor.get());
-                if (ds18b20) {
-                    int count = ds18b20->getSensorCount();
-                    for (int i = 0; i < count; i++) {
-                        std::string romId = ds18b20->getRomId(i);
-                        
-                        // Create discovery topic for each DS18B20 sensor
-                        // Using ROM ID as unique identifier
-                        allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(romId, "temperature",
-                            "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos);
-                    }
-                } else {
-                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to cast sensor to DS18B20 despite name match - skipping discovery");
+                // Safe to use static_cast here because getName() guarantees the type
+                // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
+                auto* ds18b20 = static_cast<SensorDS18B20*>(sensor.get());
+                
+                int count = ds18b20->getSensorCount();
+                for (int i = 0; i < count; i++) {
+                    std::string romId = ds18b20->getRomId(i);
+                    
+                    // Create discovery topic for each DS18B20 sensor
+                    // Using ROM ID as unique identifier
+                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(romId, "temperature",
+                        "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos);
                 }
             }
         }
