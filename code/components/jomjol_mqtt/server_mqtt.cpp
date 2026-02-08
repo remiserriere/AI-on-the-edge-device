@@ -251,6 +251,8 @@ bool MQTThomeassistantDiscovery(int qos) {
                     // SHT3x Humidity sensor
                     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "humidity", 
                         "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos);
+                } else {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to cast sensor to SHT3x despite name match - skipping discovery");
                 }
             }
             else if (sensor->getName() == "DS18B20") {
@@ -265,6 +267,8 @@ bool MQTThomeassistantDiscovery(int qos) {
                         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(romId, "temperature",
                             "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos);
                     }
+                } else {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to cast sensor to DS18B20 despite name match - skipping discovery");
                 }
             }
         }
