@@ -1450,6 +1450,11 @@
                 <input type="checkbox" id="Category_SHT3x_enabled" value="1"  onclick = 'UpdateAfterCategoryCheck()' unchecked >
                 <label for=Category_SHT3x_enabled>SHT3x (Temperature & Humidity Sensor)</label>
                 </h4>
+            </td>
+        </tr>
+
+        <tr class="SHT3xItem">
+            <td colspan="3">
                 <div style="background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 10px; margin: 5px 0; font-size: 0.9em;">
                     <strong>⚠️ GPIO Configuration Required:</strong> Before enabling this sensor, you must configure GPIO pins for I²C communication.
                     <br><br>
@@ -1538,6 +1543,11 @@
                 <input type="checkbox" id="Category_DS18B20_enabled" value="1"  onclick = 'UpdateAfterCategoryCheck()' unchecked >
                 <label for=Category_DS18B20_enabled>DS18B20 (Temperature Sensor - Chainable)</label>
                 </h4>
+            </td>
+        </tr>
+
+        <tr class="DS18B20Item">
+            <td colspan="3">
                 <p style="font-size: 0.9em; color: #666; margin: 5px 0;">Multiple DS18B20 sensors can be chained on same wire. Each sensor is identified by unique ROM ID.</p>
                 <div style="background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 10px; margin: 5px 0; font-size: 0.9em;">
                     <strong>⚠️ GPIO Configuration Required:</strong> Before enabling this sensor, you must configure GPIO pins for 1-Wire communication.
@@ -1618,9 +1628,10 @@
         <tr class="GPIO_item expert">
             <td colspan="3">
                 <div style="background-color: #e3f2fd; border-left: 4px solid #2196F3; padding: 10px; margin: 10px 0;">
-                    <strong>ℹ️ GPIO12 Note:</strong> 
-                    I²C and 1-Wire options not available (boot strapping pin conflict with pull-up resistors).
-                    Use GPIO1/GPIO3 for sensors. WS2812 LEDs work fine on GPIO12.
+                    <strong>ℹ️ GPIO Pin Notes:</strong><br>
+                    <strong>GPIO12:</strong> I²C and 1-Wire options not available (boot strapping pin conflict with pull-up resistors). WS2812 LEDs work fine on GPIO12.<br>
+                    <strong>GPIO13:</strong> Not recommended for sensors - used by SD card in all modes.<br>
+                    <strong>Recommended for sensors:</strong> GPIO1/GPIO3 (will disable USB serial logging).
                     <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/parameter-pages/GPIO/IO12" target="_blank">Details</a>
                 </div>
             </td>
