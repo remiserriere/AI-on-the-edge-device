@@ -114,17 +114,20 @@ void SensorBase::sensorTask()
     const TickType_t xDelay = pdMS_TO_TICKS(intervalMs);
     
     // Add initial delay before first read to:
-    // 1. Allow system to fully stabilize after initialization (few seconds needed)
-    // 2. Stagger sensor reads across different intervals (avoid all reading at once)
+    // 1. Allow system to fully stabilize after initialization
+    // 2. Stagger sensor reads across different intervals
     // 3. Avoid immediate collision with async init tasks
-    // 
-    // Use a short fixed delay instead of waiting the full interval
-    // Users want to see sensor data quickly after boot, not after 60+ seconds
-    const int INITIAL_DELAY_SECONDS = 10;  // 10 seconds is enough for system stabilization
-    TickType_t initialDelay = pdMS_TO_TICKS(INITIAL_DELAY_SECONDS * 1000);
+    // Use a shorter delay for long intervals to get first reading sooner
+    TickType_t initialDelay = xDelay;
+    if (_readInterval > 300) {  // If interval > 5 minutes
+        initialDelay = pdMS_TO_TICKS(30000);  // Use 30 second initial delay instead
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Using 30s initial delay for long interval sensor: " + sensorName);
+    }
     
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Waiting " + std::to_string(INITIAL_DELAY_SECONDS) + 
-                        "s for system stabilization before first read of sensor: " + sensorName);
+    // Calculate delay in seconds for logging
+    float initialDelaySeconds = (float)initialDelay / (float)configTICK_RATE_HZ;
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Waiting " + std::to_string((int)initialDelaySeconds) + 
+                        "s before first read for sensor: " + sensorName);
     vTaskDelay(initialDelay);
     
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Starting main loop for sensor: " + sensorName + 
@@ -137,17 +140,14 @@ void SensorBase::sensorTask()
         // Note: readData() spawns an async task that handles publishing
         // Don't publish here to avoid double-publishing
         
-        // Split logging into simpler statements to avoid crashes from complex string concatenation
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "=== Periodic task iteration #" + std::to_string(iteration) + " ===");
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sensor: " + sensorName);
+        // Simplified logging to avoid memory issues from repeated string concatenation
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Periodic iteration " + std::to_string(iteration));
         
         bool readStarted = readData();
         if (!readStarted) {
-            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to start read for sensor: " + sensorName + 
-                                " (previous read still in progress or sensor not initialized)");
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to start read (task busy or not initialized)");
         }
         
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Sleeping for " + std::to_string(_readInterval) + "s");
         vTaskDelay(xDelay);
     }
 }
