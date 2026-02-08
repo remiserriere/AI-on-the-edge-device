@@ -71,9 +71,22 @@ std::string createNodeId(std::string &topic) {
     return (splitPos == std::string::npos) ? topic : topic.substr(splitPos + 1);
 }
 
+/**
+ * Helper function to determine the base MQTT topic for external sensors
+ * @param customTopic The custom MQTT topic configured for the sensor (may be empty)
+ * @param sensorType The sensor type (e.g., "sht3x", "ds18b20")
+ * @return The base topic to use (custom if configured, otherwise maintopic/sensorType)
+ */
+std::string getSensorBaseTopic(const std::string& customTopic, const std::string& sensorType) {
+    if (customTopic.empty()) {
+        return maintopic + "/" + sensorType;
+    }
+    return customTopic;
+}
+
 bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
     std::string name, std::string icon, std::string unit, std::string deviceClass, std::string stateClass, std::string entityCategory,
-    int qos) {
+    int qos, std::string discoveryBaseTopic = "", std::string sensorTypePrefix = "") {
     std::string version = std::string(libfive_git_version());
 
     if (version == "") {
@@ -93,12 +106,22 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
         // Replace "/" with "_" to create valid MQTT topic names
         std::string sanitized_group = group;
         std::replace(sanitized_group.begin(), sanitized_group.end(), '/', '_');
-        configTopic = sanitized_group + "_" + field;
+        
+        // For external sensors, prepend sensor type prefix to ensure uniqueness across sensor types
+        if (sensorTypePrefix != "") {
+            configTopic = sensorTypePrefix + "_" + sanitized_group + "_" + field;
+        } else {
+            configTopic = sanitized_group + "_" + field;
+        }
         
         // For multiple meters, also update the name
         if ((*NUMBERS).size() > 1) {
             name = group + " " + name;
         }
+    }
+    // For external sensors with empty group, add sensor type prefix to config topic for uniqueness
+    else if (sensorTypePrefix != "") {
+        configTopic = sensorTypePrefix + "_" + field;
     }
 
     if (field == "problem") { // Special case: Binary sensor which is based on error topic
@@ -116,16 +139,22 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
      *      <discovery_prefix>/<component>/[<node_id>/]<object_id>/config
      * if the main topic is embedded in a nested structure, we just use the last part as node_id 
      * This means a maintopic "home/test/watermeter" is transformed to the discovery topic "homeassistant/sensor/watermeter/..."
+     * 
+     * IMPORTANT: For external sensors with custom topics, we still use maintopic as node_id
+     * to keep all sensors grouped under the parent device in Home Assistant, but we use
+     * the custom topic (discoveryBaseTopic) for state_topic to match where data is actually published.
     */
+    std::string baseTopic = discoveryBaseTopic.empty() ? maintopic : discoveryBaseTopic;
+    // Always use maintopic for node_id to keep sensors grouped under parent device
     std::string node_id = createNodeId(maintopic);
     topicFull = "homeassistant/" + component + "/" + node_id + "/" + configTopic + "/config";
     
     /* See https://www.home-assistant.io/docs/mqtt/discovery/ */
     payload = string("{")  +
-        "\"~\": \"" + maintopic + "\","  +
-        "\"unique_id\": \"" + maintopic + "-" + configTopic + "\","  +
-        "\"object_id\": \"" + maintopic + "_" + configTopic + "\","  + // Default entity ID; required for HA <= 2025.10
-        "\"default_entity_id\": \"" + component + "." + maintopic + "_" + configTopic + "\"," + // Default entity ID; required in HA >=2026.4
+        "\"~\": \"" + baseTopic + "\","  +
+        "\"unique_id\": \"" + baseTopic + "-" + configTopic + "\","  +
+        "\"object_id\": \"" + baseTopic + "_" + configTopic + "\","  + // Default entity ID; required for HA <= 2025.10
+        "\"default_entity_id\": \"" + component + "." + baseTopic + "_" + configTopic + "\"," + // Default entity ID; required in HA >=2026.4
         "\"name\": \"" + name + "\","  +
         "\"icon\": \"mdi:" + icon + "\",";        
 
@@ -167,11 +196,15 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
         payload += "\"entity_category\": \"" + entityCategory + "\",";
     } 
 
+    // Availability topic: Always use maintopic for LWT (Last Will and Testament)
+    // The actual connection status is published to maintopic/connection, not to custom sensor topics
     payload += 
-        "\"availability_topic\": \"~/" + std::string(LWT_TOPIC) + "\","  +
+        "\"availability_topic\": \"" + maintopic + "/" + std::string(LWT_TOPIC) + "\","  +
         "\"payload_available\": \"" + LWT_CONNECTED + "\","  +
         "\"payload_not_available\": \"" + LWT_DISCONNECTED + "\",";
 
+    // Device info: Always use maintopic for identifiers and name to ensure all sensors
+    // (including external ones with custom MQTT topics) are grouped under the parent device
     payload += string("\"device\": {")  +
         "\"identifiers\": [\"" + maintopic + "\"],"  +
         "\"name\": \"" + maintopic + "\","  +
@@ -261,15 +294,20 @@ bool MQTThomeassistantDiscovery(int qos) {
                 // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
                 auto* sht3x = static_cast<SensorSHT3x*>(sensor.get());
                 
-                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for SHT3x sensor");
+                // Get custom MQTT topic from sensor configuration and determine base topic for HAD
+                std::string baseTopic = getSensorBaseTopic(sensor->getMqttTopic(), "sht3x");
                 
-                // SHT3x Temperature sensor
-                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "temperature", 
-                    "SHT3x Temperature", "thermometer", "°C", "temperature", "measurement", "", qos);
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for SHT3x sensor with base topic: " + baseTopic);
                 
-                // SHT3x Humidity sensor
-                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "humidity", 
-                    "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos);
+                // SHT3x sensors: baseTopic already includes sensor type (either custom or maintopic/sht3x)
+                // Data is published to: baseTopic/temperature and baseTopic/humidity
+                // So state_topic should be: ~/temperature and ~/humidity (empty group)
+                // Pass sensorTypePrefix to create unique config topics (sht3x_temperature, sht3x_humidity)
+                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("", "temperature", 
+                    "SHT3x Temperature", "thermometer", "°C", "temperature", "measurement", "", qos, baseTopic, "sht3x");
+                
+                allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("", "humidity", 
+                    "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos, baseTopic, "sht3x");
                 
                 sht3xPublished = true;
             }
@@ -278,16 +316,23 @@ bool MQTThomeassistantDiscovery(int qos) {
                 // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
                 auto* ds18b20 = static_cast<SensorDS18B20*>(sensor.get());
                 
+                // Get custom MQTT topic from sensor configuration and determine base topic for HAD
+                std::string baseTopic = getSensorBaseTopic(sensor->getMqttTopic(), "ds18b20");
+                
                 int count = ds18b20->getSensorCount();
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for " + std::to_string(count) + " DS18B20 sensor(s)");
                 
                 for (int i = 0; i < count; i++) {
                     std::string romId = ds18b20->getRomId(i);
                     
-                    // Create discovery topic for each DS18B20 sensor
-                    // Using "ds18b20/ROM_ID" as group to match the MQTT topic structure
-                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("ds18b20/" + romId, "temperature",
-                        "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos);
+                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for DS18B20 " + romId + " with base topic: " + baseTopic);
+                    
+                    // DS18B20 sensors: baseTopic already includes sensor type (either custom or maintopic/ds18b20)
+                    // Data is published to: baseTopic/ROM_ID/temperature
+                    // So state_topic should be: ~/ROM_ID/temperature (group = ROM_ID only)
+                    // Pass sensorTypePrefix to ensure unique config topics (ds18b20_ROM_ID_temperature)
+                    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(romId, "temperature",
+                        "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos, baseTopic, "ds18b20");
                 }
                 
                 ds18b20Published = true;
