@@ -131,8 +131,6 @@ void doInit(void)
 #endif // ENABLE_MQTT
 
     /* Initialize sensors early - after GPIO, MQTT, InfluxDB are ready but before first flow run */
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Initializing sensors before first flow run");
-    
     // Find the ClassFlowSensors instance and initialize it early
     std::vector<ClassFlow*>* flows = flowctrl.GetFlowControll();
     if (flows) {

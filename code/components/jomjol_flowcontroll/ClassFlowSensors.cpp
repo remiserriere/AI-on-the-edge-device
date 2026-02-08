@@ -196,13 +196,13 @@ bool ClassFlowSensors::ReadParameter(FILE* pfile, std::string& aktparamgraph)
 
 void ClassFlowSensors::initializeEarly()
 {
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Starting early sensor initialization");
-    
     // Check if we have parsed configuration
     if (!_configParsed) {
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "No sensor configuration parsed - skipping early initialization");
+        // No sensor sections found in config - nothing to initialize
         return;
     }
+    
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Starting early sensor initialization");
     
     // Check if already initialized
     if (_initialized) {
