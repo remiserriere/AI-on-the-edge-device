@@ -28,6 +28,8 @@ When using GPIO12 with I²C sensors requiring pull-up resistors, the pull-up hol
 
 **Symptom:** ESP32 does not boot when sensor is connected, boots fine when disconnected.
 
+> **💡 Note:** GPIO12 CAN be used for WS2812 LEDs (which don't use pull-up resistors), but NOT for I²C or 1-Wire sensors. See [IO12 documentation](IO12.md#exception-ws2812-leds-are-safe-on-gpio12) for technical explanation.
+
 ## Compatible GPIO Pins
 
 | GPIO | Recommended | Notes |
