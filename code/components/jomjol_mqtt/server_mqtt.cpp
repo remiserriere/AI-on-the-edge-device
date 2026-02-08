@@ -240,11 +240,18 @@ bool MQTThomeassistantDiscovery(int qos) {
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HomeAssistant Discovery topics for external sensors...");
         
         const auto& sensors = sensorManager->getSensors();
+        
+        // Track which sensor types we've already published to avoid duplicates
+        bool sht3xPublished = false;
+        bool ds18b20Published = false;
+        
         for (const auto& sensor : sensors) {
-            if (sensor->getName() == "SHT3x") {
+            if (sensor->getName() == "SHT3x" && !sht3xPublished) {
                 // Safe to use static_cast here because getName() guarantees the type
                 // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
                 auto* sht3x = static_cast<SensorSHT3x*>(sensor.get());
+                
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for SHT3x sensor");
                 
                 // SHT3x Temperature sensor
                 allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "temperature", 
@@ -253,13 +260,17 @@ bool MQTThomeassistantDiscovery(int qos) {
                 // SHT3x Humidity sensor
                 allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("sht3x", "humidity", 
                     "SHT3x Humidity", "water-percent", "%", "humidity", "measurement", "", qos);
+                
+                sht3xPublished = true;
             }
-            else if (sensor->getName() == "DS18B20") {
+            else if (sensor->getName() == "DS18B20" && !ds18b20Published) {
                 // Safe to use static_cast here because getName() guarantees the type
                 // This avoids RTTI requirement (dynamic_cast) which may not be available in embedded systems
                 auto* ds18b20 = static_cast<SensorDS18B20*>(sensor.get());
                 
                 int count = ds18b20->getSensorCount();
+                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Publishing HAD for " + std::to_string(count) + " DS18B20 sensor(s)");
+                
                 for (int i = 0; i < count; i++) {
                     std::string romId = ds18b20->getRomId(i);
                     
@@ -268,6 +279,8 @@ bool MQTThomeassistantDiscovery(int qos) {
                     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("ds18b20/" + romId, "temperature",
                         "DS18B20 " + romId, "thermometer", "°C", "temperature", "measurement", "", qos);
                 }
+                
+                ds18b20Published = true;
             }
         }
     }

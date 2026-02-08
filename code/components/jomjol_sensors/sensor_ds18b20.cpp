@@ -695,9 +695,9 @@ void SensorDS18B20::publishMQTT()
             baseTopic = _mqttTopic;
         }
         
-        // Include ROM ID in topic for sensor identification
+        // Include ROM ID in topic for sensor identification, with /temperature suffix
         std::string romIdStr = getRomId(i);
-        std::string topic = baseTopic + "/" + romIdStr;
+        std::string topic = baseTopic + "/" + romIdStr + "/temperature";
         
         std::string value = std::to_string(_temperatures[i]);
         MQTTPublish(topic, value, 1, true);
